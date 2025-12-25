@@ -75,6 +75,36 @@ def run_pilot(anchor_id):
     return neighborhoods
 
 if __name__ == "__main__":
-    # Use your Methyl Parathion Hydrolase ID as the test anchor
-    test_anchor = "WP_011019623.1" 
+    # Use Methyl Parathion Hydrolase ID as the test anchor
+    test_anchor = "AER10490.1"
     run_pilot(test_anchor)
+
+def print_neighborhood_summary(neighborhood_record):
+    """Prints a summary of genes found in the fetched genomic slice."""
+    print(f"\n--- Neighborhood for: {neighborhood_record.annotations.get('organism', 'Unknown')} ---")
+    print(f"Source Accession: {neighborhood_record.id}")
+    
+    # Filter for 'CDS' features (Coding Sequences)
+    genes = [f for f in neighborhood_record.features if f.type == "CDS"]
+    
+    print(f"{'Gene/Protein ID':<20} {'Start':<10} {'End':<10} {'Product'}")
+    print("-" * 70)
+    
+    for gene in genes:
+        # Extract common qualifiers
+        locus_tag = gene.qualifiers.get("locus_tag", ["N/A"])[0]
+        protein_id = gene.qualifiers.get("protein_id", ["N/A"])[0]
+        product = gene.qualifiers.get("product", ["N/A"])[0]
+        
+        start = gene.location.start
+        end = gene.location.end
+        
+        print(f"{protein_id:<20} {start:<10} {end:<10} {product}")
+
+# Update your __main__ block to use it:
+if __name__ == "__main__":
+    test_anchor = "AER10490.1"
+    neighborhoods = run_pilot(test_anchor)
+    
+    for nb in neighborhoods:
+        print_neighborhood_summary(nb)
