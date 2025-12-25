@@ -1,0 +1,14 @@
+# Secret keys 
+.env 
+
+# Python Files
+__pycache__/
+*.py[cod]
+
+# Bioinformatics data
+data/
+results/
+
+# MacOS System Files
+.DS_Store
+
