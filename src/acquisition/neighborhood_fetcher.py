@@ -21,12 +21,23 @@ else:
 RAW_DIR = "data/raw"
 INTERIM_DIR = "data/interim"
 
-def search_homologs(anchor_id, limit=10):
-    """Finds homologs of the anchor protein using NCBI BLAST."""
-    print(f"Finding top {limit} homologs for {anchor_id}...")
-    # Using E-search to find similar proteins (simplified BLAST-like approach)
-    handle = Entrez.esearch(db="protein", term=f"{anchor_id}", retmax=limit)
+def search_homologs(query_name, limit=10):
+    """
+    Finds homologs for a protein name, restricted to Bacteria, 
+    ensuring a broader taxonomic spread.
+    """
+    print(f"Finding top {limit} bacterial homologs for '{query_name}'...")
+    
+    # [ORGN] restricts to Bacteria
+    # [PROT] ensures we are looking at the protein name
+    # "NOT hypothetical" filters out unannotated junk
+    search_term = f"{query_name}[PROT] AND Bacteria[ORGN] NOT hypothetical protein[PROT]"
+    
+    # We use 'sort="Relevance"' to get the best matches first
+    handle = Entrez.esearch(db="protein", term=search_term, retmax=limit, sort="Relevance")
     record = Entrez.read(handle)
+    handle.close()
+    
     return record["IdList"]
 
 def get_hit_details(id_list):
@@ -80,19 +91,49 @@ def fetch_neighborhood(protein_id, window=10000):
         return None
 
 # Pipeline starts here
-def run_pilot(anchor_id):
-    homologs = search_homologs(anchor_id)
-
-    get_hit_details(homologs)
-
-    neighborhoods = []
+def run_pilot(query_name):
+    # 1. Search for 50 hits
+    all_hits = search_homologs(query_name, limit=50)
     
-    for hit in tqdm(homologs, desc="Fetching Neighborhoods"):
+    if not all_hits:
+        print("No homologs found.")
+        return []
+    
+    # 2. Get summaries
+    handle = Entrez.esummary(db="protein", id=",".join(all_hits))
+    summaries = Entrez.read(handle)
+    handle.close()
+    
+    # Handle Biopython's dictionary vs list return structure
+    items = summaries['DocumentSummarySet']['DocumentSummary'] if 'DocumentSummarySet' in summaries else summaries
+    
+    unique_homologs = []
+    seen_taxids = set()
+    
+    print(f"\n--- Selecting 10 Diverse Species ---")
+    for entry in items:
+        # Use TaxId instead of TaxEntityStr to avoid KeyErrors
+        taxid = entry.get('TaxId')
+        protein_id = entry.get('Id')
+        title = entry.get('Title', 'Unknown')
+
+        if taxid not in seen_taxids:
+            seen_taxids.add(taxid)
+            unique_homologs.append(protein_id)
+            print(f"Added: {protein_id} from TaxID {taxid} ({title[:50]}...)")
+        
+        if len(unique_homologs) >= 10:
+            break
+
+    print(f"\nFound {len(unique_homologs)} diverse species. Proceeding to fetch neighborhoods...")
+    
+    neighborhoods = []
+    # 3. Fetch the neighborhoods for the unique set
+    for hit in tqdm(unique_homologs, desc="Fetching Neighborhoods"):
         nb = fetch_neighborhood(hit)
         if nb:
             neighborhoods.append(nb)
     
-    print(f"✅ Successfully cached {len(neighborhoods)} neighborhoods.")
     return neighborhoods
 
 
