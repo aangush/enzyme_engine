@@ -29,6 +29,23 @@ def search_homologs(anchor_id, limit=10):
     record = Entrez.read(handle)
     return record["IdList"]
 
+def get_hit_details(id_list):
+    """Fetches and prints titles for the IDs found by esearch."""
+    if not id_list:
+        print("No hits found to summarize.")
+        return
+    
+    print(f"\n--- Identifying {len(id_list)} Hits ---")
+    # esummary gives us the 'Title' and 'Organism' without downloading the whole genome
+    handle = Entrez.esummary(db="protein", id=",".join(id_list))
+    summaries = Entrez.read(handle)
+    handle.close()
+    
+    for i, entry in enumerate(summaries):
+        # entry['Title'] is usually: "Protein Name [Organism Name]"
+        print(f"Hit {i+1}: {entry['Id']} - {entry['Title']}")
+
+
 def fetch_neighborhood(protein_id, window=10000):
     """Fetches genomic context. Implements local caching."""
     cache_path = os.path.join(RAW_DIR, f"{protein_id}_context.gbk")
@@ -62,8 +79,12 @@ def fetch_neighborhood(protein_id, window=10000):
         print(f" Error fetching {protein_id}: {e}")
         return None
 
+# Pipeline starts here
 def run_pilot(anchor_id):
     homologs = search_homologs(anchor_id)
+
+    get_hit_details(homologs)
+
     neighborhoods = []
     
     for hit in tqdm(homologs, desc="Fetching Neighborhoods"):
@@ -74,10 +95,6 @@ def run_pilot(anchor_id):
     print(f"✅ Successfully cached {len(neighborhoods)} neighborhoods.")
     return neighborhoods
 
-if __name__ == "__main__":
-    # Use Methyl Parathion Hydrolase ID as the test anchor
-    test_anchor = "AER10490.1"
-    run_pilot(test_anchor)
 
 def print_neighborhood_summary(neighborhood_record):
     """Prints a summary of genes found in the fetched genomic slice."""
@@ -103,8 +120,8 @@ def print_neighborhood_summary(neighborhood_record):
 
 # Update your __main__ block to use it:
 if __name__ == "__main__":
-    test_anchor = "AER10490.1"
-    neighborhoods = run_pilot(test_anchor)
+    test_query = "Methyl parathion hydrolase"
+    neighborhoods = run_pilot(test_query)
     
-    for nb in neighborhoods:
+    for nb in neighborhoods[:2]:
         print_neighborhood_summary(nb)
