@@ -4,15 +4,14 @@ from collections import defaultdict
 
 RAW_DIR = "data/raw"
 
-def analyze_neighborhoods(anchor_accession_substring="hydrolase"):
+def analyze_neighborhoods(center_point=10000):
     """
-    Parses cached GenBank files to find common genomic neighbors.
+    Parses cached GenBank files. 
+    Identifies anchor by position (center) and treats hypothetical proteins as individuals.
     """
-    # Dictionary to store neighbor stats: { "Product Name": [list of distances] }
     neighbor_data = defaultdict(list)
     total_genomes = 0
 
-    # Loop through every cached GenBank file
     for filename in os.listdir(RAW_DIR):
         if not filename.endswith(".gbk"):
             continue
@@ -21,36 +20,43 @@ def analyze_neighborhoods(anchor_accession_substring="hydrolase"):
         record = SeqIO.read(path, "genbank")
         total_genomes += 1
         
-        # 1. Find the 'Anchor' gene in this specific slice
-        anchor_feature = None
         cds_features = [f for f in record.features if f.type == "CDS"]
         
+        # 1. FIND ANCHOR BY POSITION
+        # The anchor is the gene that contains the center point (usually 10,000)
+        anchor_feature = None
         for feat in cds_features:
-            product = feat.qualifiers.get("product", [""])[0].lower()
-            prot_id = feat.qualifiers.get("protein_id", [""])[0]
-            
-            # We identify the anchor by checking if it matches our query protein
-            if anchor_accession_substring.lower() in product or anchor_accession_substring in prot_id:
+            if feat.location.start <= center_point <= feat.location.end:
                 anchor_feature = feat
                 break
         
         if not anchor_feature:
-            continue
+            # Fallback: find the one closest to the center
+            cds_features.sort(key=lambda f: abs(((f.location.start + f.location.end)/2) - center_point))
+            anchor_feature = cds_features[0]
 
         anchor_center = (anchor_feature.location.start + anchor_feature.location.end) / 2
 
-        # 2. Calculate distance to every other neighbor
+        # 2. PROCESS NEIGHBORS
         for feat in cds_features:
             if feat == anchor_feature:
                 continue
                 
-            product = feat.qualifiers.get("product", ["hypothetical protein"])[0]
-            feat_center = (feat.location.start + feat.location.end) / 2
+            # Clean up the product name
+            raw_product = feat.qualifiers.get("product", ["hypothetical protein"])[0]
+            product = raw_product.strip().lower() # Standardize case
             
-            # Absolute distance in base pairs
+            # If it's hypothetical, attach the ID so they aren't all 'blobbed' together
+            if "hypothetical" in product:
+                prot_id = feat.qualifiers.get("protein_id", ["no_id"])[0]
+                label = f"Hypothetical ({prot_id})"
+            else:
+                label = product.capitalize()
+
+            feat_center = (feat.location.start + feat.location.end) / 2
             distance = abs(anchor_center - feat_center)
             
-            neighbor_data[product].append(distance)
+            neighbor_data[label].append(distance)
 
     return neighbor_data, total_genomes
 
@@ -75,5 +81,5 @@ def print_gnn_report(neighbor_data, total_genomes):
 
 if __name__ == "__main__":
     # Run the analysis
-    data, count = analyze_neighborhoods("hydrolase")
+    data, count = analyze_neighborhoods()
     print_gnn_report(data, count)
