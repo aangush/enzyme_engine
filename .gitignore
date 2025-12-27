@@ -12,3 +12,6 @@ results/
 # MacOS System Files
 .DS_Store
 
+# Ignore Jupyter notebooks used for experimentation
+*.ipynb
+.ipynb_checkpoints/
