@@ -90,7 +90,7 @@ def fetch_neighborhood(protein_id, window=10000):
         print(f" Error fetching {protein_id}: {e}")
         return None
 
-# Pipeline starts here
+# Main starter function for running the pipeline
 def run_pilot(query_name):
     # 1. Search for 50 hits
     all_hits = search_homologs(query_name, limit=50)
@@ -113,8 +113,8 @@ def run_pilot(query_name):
     print(f"\n--- Selecting 10 Diverse Species ---")
     for entry in items:
         # Use TaxId instead of TaxEntityStr to avoid KeyErrors
-        taxid = entry.get('TaxId')
-        protein_id = entry.get('Id')
+        taxid = int(entry.get('TaxId'))
+        protein_id = str(entry.get('Id'))
         title = entry.get('Title', 'Unknown')
 
         if taxid not in seen_taxids:
