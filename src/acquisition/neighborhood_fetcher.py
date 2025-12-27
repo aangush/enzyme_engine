@@ -58,36 +58,63 @@ def get_hit_details(id_list):
 
 
 def fetch_neighborhood(protein_id, window=10000):
-    """Fetches genomic context. Implements local caching."""
+    """Fetches genomic context by mapping proteins back to their genomic assemblies."""
     cache_path = os.path.join(RAW_DIR, f"{protein_id}_context.gbk")
     
     if os.path.exists(cache_path):
         return SeqIO.read(cache_path, "genbank")
 
     try:
-        # Get IPG report to find the genomic coordinates
+        # 1. Get IPG report to find where this protein lives in a GENOME
         handle = Entrez.efetch(db="protein", id=protein_id, rettype="ipg", retmode="xml")
         ipg_data = Entrez.read(handle)
+        handle.close()
         
-        # Extract location (using first coordinates found)
-        loc = ipg_data['IPGReport']['ProteinList'][0]['CDSList'][0]
-        acc = loc.attributes['accver']
-        start = int(loc.attributes['start'])
-        stop = int(loc.attributes['stop'])
+        # 2. Extract the first genomic location available
+        # Some proteins might have multiple locations; we take the first high-quality one
+        protein_list = ipg_data.get('IPGReport', {}).get('ProteinList', [])
+        if not protein_list:
+            print(f" No IPG report for {protein_id}")
+            return None
+            
+        cds_list = protein_list[0].get('CDSList', [])
+        if not cds_list:
+            print(f" No genomic coordinates found for {protein_id} (Orphan record)")
+            return None
+            
+        # We look for a location that has a nucleotide accession (accver)
+        loc = cds_list[0]
+        nuc_acc = loc.attributes.get('accver')
+        start = int(loc.attributes.get('start'))
+        stop = int(loc.attributes.get('stop'))
+        strand = loc.attributes.get('strand')
         
-        # Define window and fetch GenBank
-        s_start, s_stop = max(0, start - window), stop + window
-        handle = Entrez.efetch(db="nucleotide", id=acc, seq_start=s_start, 
-                               seq_stop=s_stop, rettype="gbwithparts", retmode="text")
+        if not nuc_acc:
+            print(f" No nucleotide accession for {protein_id}")
+            return None
+
+        # 3. Define the window on the NUCLEOTIDE sequence
+        s_start = max(1, start - window)
+        s_stop = stop + window
+        
+        # 4. Fetch the 20kb slice from the CHROMOSOME/CONTIG
+        # Use rettype="gbwithparts" to ensure we get the sequence AND features
+        handle = Entrez.efetch(db="nucleotide", id=nuc_acc, 
+                               seq_start=s_start, seq_stop=s_stop, 
+                               rettype="gbwithparts", retmode="text")
         
         record = SeqIO.read(handle, "genbank")
+        handle.close()
+
+        # Save to cache
         with open(cache_path, "w") as f:
             SeqIO.write(record, f, "genbank")
         
-        time.sleep(0.5) # Mandatory rate limit to be a good citizen
+        time.sleep(0.5) 
         return record
+
     except Exception as e:
-        print(f" Error fetching {protein_id}: {e}")
+        print(f" Error fetching genomic neighborhood for {protein_id}: {e}")
         return None
 
 # Main starter function for running the pipeline
