@@ -21,7 +21,7 @@ else:
 RAW_DIR = "data/raw"
 INTERIM_DIR = "data/interim"
 
-def search_homologs(query_name, limit=10):
+def search_homologs(query_name, limit=50):
     """
     Finds homologs for a protein name, restricted to Bacteria, 
     ensuring a broader taxonomic spread.
@@ -149,7 +149,7 @@ def run_pilot(query_name):
             unique_homologs.append(protein_id)
             print(f"Added: {protein_id} from TaxID {taxid} ({title[:50]}...)")
         
-        if len(unique_homologs) >= 10:
+        if len(unique_homologs) >= 30:
             break
 
     print(f"\nFound {len(unique_homologs)} diverse species. Proceeding to fetch neighborhoods...")
@@ -188,7 +188,7 @@ def print_neighborhood_summary(neighborhood_record):
 
 # Update your __main__ block to use it:
 if __name__ == "__main__":
-    test_query = "Methyl parathion hydrolase"
+    test_query = "2-polyprenyl-6-methoxyphenol hydroxylase"
     neighborhoods = run_pilot(test_query)
     
     for nb in neighborhoods[:2]:
