@@ -180,7 +180,6 @@ def print_neighborhood_summary(neighborhood_record):
         locus_tag = gene.qualifiers.get("locus_tag", ["N/A"])[0]
         protein_id = gene.qualifiers.get("protein_id", ["N/A"])[0]
         product = gene.qualifiers.get("product", ["N/A"])[0]
-        
         start = gene.location.start
         end = gene.location.end
         
