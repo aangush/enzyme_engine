@@ -45,22 +45,36 @@ def run_gnn_scout(input_fasta_path, hit_limit=15):
     generate_summary_report()
 
 def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
+    anchor_id = loc.get('anchor_id') # Ensure this is passed or available
+    anchor_strand = loc['strand']
+    
     for feat in record.features:
         if feat.type == "CDS":
-            # The coordinates in the 'record' are relative to the slice (0 to ~20000)
-            # The anchor is always roughly at index 'window' (10000)
-            f_start = int(feat.location.start)
+            prot_id = feat.qualifiers.get("protein_id", ["no_id"])[0]
             
-            # Skip if this is the anchor itself
-            if f_start >= (window - 100) and f_start <= (window + 100):
+            # 1. STRICT EXCLUSION: If the neighbor's ID is our anchor, skip it.
+            if prot_id == anchor_id:
                 continue
                 
+            # 2. COORDINATE EXCLUSION (Safety net):
+            # The anchor is centered at 'window'. If the feature overlaps the center, skip.
+            f_start = int(feat.location.start)
+            f_end = int(feat.location.end)
+            if f_start <= window <= f_end:
+                continue
+
             product = feat.qualifiers.get("product", ["unknown"])[0]
-            prot_id = feat.qualifiers.get("protein_id", ["no_id"])[0]
             translation = feat.qualifiers.get("translation", [""])[0]
-            dist = int(abs(window - f_start))
             
-            db.add_neighbor(instance_id, prot_id, product, dist, "N/A", translation)
+            # 3. STRAND CALCULATION:
+            neighbor_strand = feat.location.strand
+            direction = "Same" if neighbor_strand == anchor_strand else "Oppose"
+            
+            # Distance from center
+            feat_center = (f_start + f_end) / 2
+            dist = int(abs(window - feat_center))
+            
+            db.add_neighbor(instance_id, prot_id, product, dist, direction, translation)
 
 def generate_summary_report():
     print("\n" + "="*55)

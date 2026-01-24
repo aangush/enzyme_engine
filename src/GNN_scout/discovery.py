@@ -5,6 +5,7 @@ class DiscoveryEngine:
         print(f"🧬 Sending sequence to NCBI BLASTp (This takes 1-3 minutes)...")
         try:
             # The correct parameter name for Biopython's qblast is 'hitmax'
+            # Main BLAST search for initial homologs, lots of room here for optimization/tweaking
             result_handle = NCBIWWW.qblast("blastp", "nr", sequence_fasta, hitlist_size=hit_limit)
             
             blast_record = NCBIXML.read(result_handle)
