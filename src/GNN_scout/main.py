@@ -31,6 +31,8 @@ def run_gnn_scout(input_fasta_path, hit_limit=15):
         if not locations: continue
         
         loc = locations[0]
+        loc['anchor_id'] = pid
+
         if db.instance_exists(pid, loc['nuc_acc']):
             print(f"⏩ Skipping {pid}, already in database.")
             continue
@@ -45,19 +47,19 @@ def run_gnn_scout(input_fasta_path, hit_limit=15):
     generate_summary_report()
 
 def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
-    anchor_id = loc.get('anchor_id') # Ensure this is passed or available
+    # Anchor metadata for comparison
+    anchor_id = loc.get('anchor_id')
     anchor_strand = loc['strand']
     
     for feat in record.features:
         if feat.type == "CDS":
             prot_id = feat.qualifiers.get("protein_id", ["no_id"])[0]
             
-            # 1. STRICT EXCLUSION: If the neighbor's ID is our anchor, skip it.
+            # 1. Identity Check: Skip if this neighbor is actually the anchor protein
             if prot_id == anchor_id:
                 continue
                 
-            # 2. COORDINATE EXCLUSION (Safety net):
-            # The anchor is centered at 'window'. If the feature overlaps the center, skip.
+            # 2. Coordinate Check: Skip if it overlaps the center of our window
             f_start = int(feat.location.start)
             f_end = int(feat.location.end)
             if f_start <= window <= f_end:
@@ -66,42 +68,52 @@ def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
             product = feat.qualifiers.get("product", ["unknown"])[0]
             translation = feat.qualifiers.get("translation", [""])[0]
             
-            # 3. STRAND CALCULATION:
+            # 3. Dynamic Strand Calculation (The Fix)
+            # Biopython uses 1 for forward, -1 for reverse
             neighbor_strand = feat.location.strand
             direction = "Same" if neighbor_strand == anchor_strand else "Oppose"
             
-            # Distance from center
+            # 4. Distance Calculation
             feat_center = (f_start + f_end) / 2
             dist = int(abs(window - feat_center))
             
+            # Save with the real direction instead of "N/A"
             db.add_neighbor(instance_id, prot_id, product, dist, direction, translation)
 
 def generate_summary_report():
-    print("\n" + "="*70)
-    print("📊 GNN LINKAGE SUMMARY")
-    print("="*70)
-    conn = sqlite3.connect("data/scout.db")
+    print("\n" + "="*75)
+    print("📊 GNN LINKAGE SUMMARY: RELATIVE STRAND ANALYSIS")
+    print("="*75)
+    
+    db_path = "data/scout.db"
+    if not os.path.exists(db_path):
+        print("❌ Database not found.")
+        return
+
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # Group by product AND direction to see if certain genes 
-    # are always on the same or opposite strand as your anchor.
+    # Query: Group by product and direction to see conservation patterns
     query = """
     SELECT product, direction, COUNT(*) as freq 
     FROM neighbors 
     GROUP BY product, direction 
     ORDER BY freq DESC 
-    LIMIT 20
+    LIMIT 25
     """
     cursor.execute(query)
     results = cursor.fetchall()
     
-    print(f"{'Neighbor Product':<40} | {'Strand':<8} | {'Freq'}")
-    print("-" * 70)
+    print(f"{'Neighbor Product':<45} | {'Strand':<10} | {'Freq'}")
+    print("-" * 75)
     for row in results:
-        product_name = (row[0][:37] + '..') if len(row[0]) > 37 else row[0]
-        print(f"{product_name:<40} | {row[1]:<8} | {row[2]}")
+        # Format the display name
+        display_name = (row[0][:42] + '..') if len(row[0]) > 42 else row[0]
+        # row[1] is now the actual 'Same' or 'Oppose' string
+        print(f"{display_name:<45} | {row[1]:<10} | {row[2]}")
+    
     conn.close()
-    print("="*70)
+    print("="*75)
 
 if __name__ == "__main__":
-    run_gnn_scout("input.fasta", hit_limit=15)
+    run_gnn_scout("input.fasta", hit_limit=20)

@@ -55,6 +55,7 @@ class NCBIClient:
             attr = cds.attributes if hasattr(cds, 'attributes') else cds
             locations_list.append({'nuc_acc': attr.get('accver'), 'start': int(attr.get('start', 0)), 'end': int(attr.get('stop', 0)), 'strand': 1 if attr.get('strand') == '+' else -1})
 
+    # Fetch the genomic neighborhood for a +- 10kb window from each BLAST hit
     def fetch_neighborhood(self, nuc_acc, start, end, window=10000):
         f_start, f_end = max(1, start - window), end + window
         try:
