@@ -77,16 +77,31 @@ def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
             db.add_neighbor(instance_id, prot_id, product, dist, direction, translation)
 
 def generate_summary_report():
-    print("\n" + "="*55)
+    print("\n" + "="*70)
     print("📊 GNN LINKAGE SUMMARY")
-    print("="*55)
+    print("="*70)
     conn = sqlite3.connect("data/scout.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT product, COUNT(*) as freq FROM neighbors GROUP BY product ORDER BY freq DESC LIMIT 15")
-    for row in cursor.fetchall():
-        print(f"{row[0][:40]:<40} | {row[1]}")
+    
+    # Group by product AND direction to see if certain genes 
+    # are always on the same or opposite strand as your anchor.
+    query = """
+    SELECT product, direction, COUNT(*) as freq 
+    FROM neighbors 
+    GROUP BY product, direction 
+    ORDER BY freq DESC 
+    LIMIT 20
+    """
+    cursor.execute(query)
+    results = cursor.fetchall()
+    
+    print(f"{'Neighbor Product':<40} | {'Strand':<8} | {'Freq'}")
+    print("-" * 70)
+    for row in results:
+        product_name = (row[0][:37] + '..') if len(row[0]) > 37 else row[0]
+        print(f"{product_name:<40} | {row[1]:<8} | {row[2]}")
     conn.close()
-    print("="*55)
+    print("="*70)
 
 if __name__ == "__main__":
     run_gnn_scout("input.fasta", hit_limit=15)
