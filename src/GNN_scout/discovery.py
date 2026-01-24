@@ -1,12 +1,17 @@
 from Bio.Blast import NCBIWWW, NCBIXML
 
 class DiscoveryEngine:
-    def find_homologs(self, sequence_fasta, hit_limit=20):
-        print(f"🧬 Sending sequence to NCBI BLASTp (This takes 1-3 minutes)...")
+    def find_homologs(self, sequence_fasta, hit_limit=50):
+        print(f"Sending sequence to NCBI BLASTp (be patient)...")
         try:
-            # The correct parameter name for Biopython's qblast is 'hitmax'
             # Main BLAST search for initial homologs, lots of room here for optimization/tweaking
-            result_handle = NCBIWWW.qblast("blastp", "nr", sequence_fasta, hitlist_size=hit_limit)
+            result_handle = NCBIWWW.qblast("blastp", 
+                                           "nr", 
+                                           sequence_fasta, 
+                                           hitlist_size=hit_limit, 
+                                           matrix_name="BLOSUM45", 
+                                           word_size=3, 
+                                           gapcosts="15 2")
             
             blast_record = NCBIXML.read(result_handle)
             homolog_ids = []
@@ -16,8 +21,8 @@ class DiscoveryEngine:
                 accession = alignment.accession
                 homolog_ids.append(accession)
                 
-            print(f"✅ Found {len(homolog_ids)} homologs in the diversity space.")
+            print(f"Found {len(homolog_ids)} homologs in the diversity space.")
             return homolog_ids
         except Exception as e:
-            print(f"❌ BLAST failed: {e}")
+            print(f" BLAST failed: {e}")
             return []
