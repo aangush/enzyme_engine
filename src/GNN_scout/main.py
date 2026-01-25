@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(__file__))
 from discovery import DiscoveryEngine
 from ncbi_client import NCBIClient
 from db_manager import ScoutDB
+from domain_analyzer import DomainAnalyzer
 
 def run_gnn_scout(input_fasta_path, hit_limit=50):
     discovery = DiscoveryEngine()
@@ -44,6 +45,10 @@ def run_gnn_scout(input_fasta_path, hit_limit=50):
             instance_id = db.add_instance(pid, loc['nuc_acc'], loc['start'], loc['end'], loc['strand'])
             extract_and_save_neighbors(record, instance_id, loc, db)
 
+    # 2.5 DOMAIN ANALYSIS
+    analyzer = DomainAnalyzer(db_path="data/scout.db")
+    analyzer.analyze_hypotheticals()
+
     # 3. REPORT - The Linkage Summary
     generate_summary_report()
 
@@ -79,33 +84,33 @@ def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
             db.add_neighbor(instance_id, prot_id, product, dist, direction, translation)
 
 def generate_summary_report():
-    print("\n" + "="*80)
-    print("GNN ANALYSIS: TOP CONSERVED GENETIC LINKS")
-    print("="*80)
+    print("\n" + "="*95)
+    print("GNN ANALYSIS: TOP CONSERVED GENOMIC NEIGHBORS")
+    print("="*95)
     
     conn = sqlite3.connect("data/scout.db")
     cursor = conn.cursor()
     
     # We only show neighbors appearing multiple times (High-frequency linkage)
     query = """
-    SELECT product, direction, COUNT(*) as freq 
+    SELECT product, direction, COUNT(*) as freq, CAST(AVG(distance_bp) AS INT) as avg_dist
     FROM neighbors 
     GROUP BY product, direction 
-    HAVING freq > 1
+    HAVING freq >= 1
     ORDER BY freq DESC 
     LIMIT 30
     """
     cursor.execute(query)
     results = cursor.fetchall()
     
-    print(f"{'Neighbor Product':<50} | {'Strand':<10} | {'Freq'}")
+    print(f"{'Neighbor Product (Identified Domains)':<50} | {'Strand':<10} | {'Freq'} | {'Avg Dist'}")
     print("-" * 80)
     for row in results:
         p_name = (row[0][:47] + '..') if len(row[0]) > 47 else row[0]
-        print(f"{p_name:<50} | {row[1]:<10} | {row[2]}")
+        print(f"{p_name:<50} | {row[1]:<10} | {row[2]:<5} | {row[3]} bp")
     
     conn.close()
-    print("="*80)
+    print("="*95)
 
 if __name__ == "__main__":
     # Target 50 homologs to map the diversity space

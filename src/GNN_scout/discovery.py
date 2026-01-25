@@ -8,10 +8,7 @@ class DiscoveryEngine:
             result_handle = NCBIWWW.qblast("blastp", 
                                            "nr", 
                                            sequence_fasta, 
-                                           hitlist_size=hit_limit, 
-                                           matrix_name="BLOSUM45", 
-                                           word_size=3, 
-                                           gapcosts="15 2")
+                                           hitlist_size=hit_limit)
             
             blast_record = NCBIXML.read(result_handle)
             homolog_ids = []
