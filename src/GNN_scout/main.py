@@ -98,7 +98,7 @@ def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
 
 def generate_summary_report():
     print("\n" + "="*115)
-    print("📊 GENOMIC NEIGHBORHOOD REPORT: SYNTENY & DIVERSITY MAPPING")
+    print("📊 GENOMIC NEIGHBORHOOD REPORT")
     print("="*115)
     
     conn = sqlite3.connect("data/scout.db")
@@ -131,4 +131,4 @@ def generate_summary_report():
     print("="*115)
 
 if __name__ == "__main__":
-    run_gnn_scout("input.fasta", hit_limit=100)
+    run_gnn_scout("input.fasta", hit_limit=200)
