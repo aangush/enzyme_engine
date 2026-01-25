@@ -113,5 +113,5 @@ def generate_summary_report():
     print("="*95)
 
 if __name__ == "__main__":
-    # Target 50 homologs to map the diversity space
-    run_gnn_scout("input.fasta", hit_limit=50)
+    # Target 100 homologs to map the diversity space
+    run_gnn_scout("input.fasta", hit_limit=100)

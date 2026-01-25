@@ -1,0 +1,60 @@
+import sqlite3
+import os
+from difflib import SequenceMatcher
+
+def get_similarity(a, b):
+    """Calculates a simple sequence identity ratio."""
+    return SequenceMatcher(None, a, b).ratio()
+
+def cluster_and_export(db_path="data/scout.db", output_fasta="data/mystery_clusters.fasta", threshold=0.95):
+    if not os.path.exists(db_path):
+        print("Database not found.")
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Query all 'No Pfam Hit' sequences
+    cursor.execute("""
+        SELECT protein_id, sequence, product 
+        FROM neighbors 
+        WHERE product LIKE '%No Pfam Hit%' AND sequence != ''
+    """)
+    results = cursor.fetchall()
+    conn.close()
+
+    if not results:
+        print("🔍 No mystery sequences found to cluster.")
+        return
+
+    print(f"Analyzing {len(results)} sequences for redundancy...")
+
+    clusters = [] # List of dicts: {'rep_id': str, 'seq': str, 'members': [ids]}
+
+    for prot_id, seq, prod in results:
+        matched = False
+        for cluster in clusters:
+            if get_similarity(seq, cluster['seq']) >= threshold:
+                cluster['members'].append(prot_id)
+                matched = True
+                break
+        
+        if not matched:
+            clusters.append({
+                'rep_id': prot_id,
+                'seq': seq,
+                'members': [prot_id]
+            })
+
+    print(f"Redundancy reduced: {len(results)} sequences collapsed into {len(clusters)} unique clusters.")
+
+    # Export the representative for each cluster
+    with open(output_fasta, "w") as f:
+        for c in clusters:
+            count = len(c['members'])
+            f.write(f">{c['rep_id']} | ClusterSize: {count} | Members: {', '.join(c['members'][:3])}...\n{c['seq']}\n")
+
+    print(f"Exported representatives to {output_fasta}")
+
+if __name__ == "__main__":
+    cluster_and_export()

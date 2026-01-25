@@ -1,7 +1,7 @@
 from Bio.Blast import NCBIWWW, NCBIXML
 
 class DiscoveryEngine:
-    def find_homologs(self, sequence_fasta, hit_limit=50):
+    def find_homologs(self, sequence_fasta, hit_limit=100):
         print(f"Sending sequence to NCBI BLASTp (be patient)...")
         try:
             # Main BLAST search for initial homologs, lots of room here for optimization/tweaking
