@@ -77,40 +77,46 @@ def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
             neighbor_strand = feat.location.strand
             direction = "Same" if neighbor_strand == anchor_strand else "Oppose"
             
-            # Distance
+            # Signed Distance
             feat_center = (f_start + f_end) / 2
-            dist = int(abs(window - feat_center))
+            dist = int(feat_center - window)
             
             db.add_neighbor(instance_id, prot_id, product, dist, direction, translation)
 
 def generate_summary_report():
-    print("\n" + "="*95)
-    print("GNN ANALYSIS: TOP CONSERVED GENOMIC NEIGHBORS")
-    print("="*95)
+    print("\n" + "="*110)
+    print("GENOMIC NEIGHBORHOOD REPORT FOR INPUT FASTA: NO PFAMS GROUPED BY DISTANCE")
+    print("="*110)
     
     conn = sqlite3.connect("data/scout.db")
     cursor = conn.cursor()
     
-    # We only show neighbors appearing multiple times (High-frequency linkage)
     query = """
-    SELECT product, direction, COUNT(*) as freq, CAST(AVG(distance_bp) AS INT) as avg_dist
+    SELECT 
+        product, 
+        direction, 
+        COUNT(*) as freq, 
+        CAST(AVG(distance_bp) AS INT) as avg_dist,
+        CAST(MAX(distance_bp) - MIN(distance_bp) AS INT) as spread,
+        CAST(AVG(LENGTH(sequence)) AS INT) as avg_len
     FROM neighbors 
-    GROUP BY product, direction 
-    HAVING freq >= 1
+    GROUP BY product, direction
+    HAVING freq >= 2
     ORDER BY freq DESC 
-    LIMIT 30
+    LIMIT 100
     """
     cursor.execute(query)
     results = cursor.fetchall()
     
-    print(f"{'Neighbor Product (Identified Domains)':<50} | {'Strand':<10} | {'Freq'} | {'Avg Dist'}")
-    print("-" * 80)
+    print(f"{'Neighbor Product':<45} | {'Strand':<8} | {'Freq':<5} | {'Avg Dist':<10} | {'Spread':<8} | {'Avg Len'}")
+    print("-" * 105)
     for row in results:
-        p_name = (row[0][:47] + '..') if len(row[0]) > 47 else row[0]
-        print(f"{p_name:<50} | {row[1]:<10} | {row[2]:<5} | {row[3]} bp")
+        p_name = (row[0][:42] + '..') if len(row[0]) > 42 else row[0]
+        # Spread tells us if the genes are 'locked' in the same spot across different genomes
+        print(f"{p_name:<50} | {row[1]:<8} | {row[2]:<5} | {row[3]:>9} bp | {row[4]:>6} bp | {int(row[5])}aa")
     
     conn.close()
-    print("="*95)
+    print("="*110)
 
 if __name__ == "__main__":
     # Target 100 homologs to map the diversity space

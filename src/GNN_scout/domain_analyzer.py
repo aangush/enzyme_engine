@@ -1,116 +1,90 @@
 import sqlite3
 import subprocess
 import os
+from difflib import SequenceMatcher
 
 class DomainAnalyzer:
     def __init__(self, db_path="data/scout.db", pfam_path="data/pfam/Pfam-A.hmm"):
         self.db_path = db_path
         self.pfam_path = pfam_path
 
-    def analyze_hypotheticals(self):
-        """
-        Identifies unannotated proteins and attempts to assign functional domains
-        using local HMMER scans against the Pfam database.
-        """
-        print("\n" + "="*60)
-        print("STARTING HIDDEN DOMAIN ANALYSIS")
-        print("="*60)
-        
-        if not os.path.exists(self.pfam_path):
-            print(f"Error: Pfam database not found at {self.pfam_path}")
-            print("Please ensure you have run 'hmmpress' on the Pfam-A.hmm file.")
-            return
+    def _get_identity(self, a, b):
+        """Quick sequence identity ratio."""
+        return SequenceMatcher(None, a, b).ratio()
 
+    def analyze_hypotheticals(self):
+        print("\n" + "="*70)
+        print("HYBRID SYNTENY-IDENTITY ANALYSIS")
+        print("="*70)
+        
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Target: Products that are some variation of 'hypothetical' or 'unknown'
-        # Criteria: Must have a sequence, and must NOT have been analyzed yet (no parentheses)
+        # 1. Fetch un-analyzed targets
         cursor.execute("""
-            SELECT DISTINCT protein_id, sequence 
+            SELECT id, protein_id, sequence, distance_bp 
             FROM neighbors 
             WHERE (LOWER(product) LIKE '%hypothetical%' OR LOWER(product) = 'unknown') 
-            AND sequence != '' 
-            AND product NOT LIKE '%(%'
+            AND sequence != '' AND product NOT LIKE '%(%'
         """)
-        
         targets = cursor.fetchall()
-        total = len(targets)
         
-        if total == 0:
-            print("No un-analyzed hypothetical proteins found in database.")
+        if not targets:
+            print("No new sequences found.")
             conn.close()
             return
 
-        print(f"Found {total} unique sequences to analyze. Processing...")
+        # Tracking for identity-based clustering of mysteries
+        # Key: (bin_dist, len_bucket) -> List of sequences
+        mystery_clusters = {} 
 
-        hits = 0
-        for idx, (prot_id, seq) in enumerate(targets, 1):
-            # Simple progress tracker
-            if idx % 5 == 0 or idx == total:
-                print(f"Progress: {idx}/{total} sequences scanned...")
-
+        for db_id, prot_id, seq, dist in targets:
             domain = self._scan_sequence(prot_id, seq)
             
             if domain:
                 new_product = f"Hypothetical ({domain})"
-                hits += 1
             else:
-                # Labeling it ensures we don't waste time re-scanning it in future runs
-                new_product = "Hypothetical (No Pfam Hit)"
+                # SPATIAL + LENGTH BINNING
+                binned_dist = round(dist / 1000) * 1000
+                len_bucket = round(len(seq) / 50) * 50
+                cluster_key = (binned_dist, len_bucket)
+                
+                # IDENTITY CHECK
+                cluster_match = False
+                if cluster_key in mystery_clusters:
+                    for rep_seq in mystery_clusters[cluster_key]:
+                        if self._get_identity(seq, rep_seq) > 0.90:
+                            cluster_match = True
+                            break
+                
+                if not cluster_match:
+                    if cluster_key not in mystery_clusters:
+                        mystery_clusters[cluster_key] = []
+                    mystery_clusters[cluster_key].append(seq)
+                
+                prefix = "+" if binned_dist >= 0 else ""
+                new_product = f"Hypothetical (No Pfam Hit) @ {prefix}{binned_dist}bp | ~{len_bucket}aa"
             
-            cursor.execute("UPDATE neighbors SET product = ? WHERE protein_id = ?", (new_product, prot_id))
+            cursor.execute("UPDATE neighbors SET product = ? WHERE id = ?", (new_product, db_id))
         
         conn.commit()
         conn.close()
-        print("="*60)
-        print(f"ANALYSIS COMPLETE: Identified {hits} new domains across {total} targets.")
-        print("="*60)
+        print("Analysis complete. Mystery clusters merged by location and identity.")
 
     def _scan_sequence(self, prot_id, sequence):
-        """Runs hmmscan for a single sequence and returns the top hit domain name."""
         fasta_path = f"data/temp_{prot_id}.fasta"
         out_path = f"data/temp_{prot_id}.txt"
-        
-        # 1. Create temporary FASTA
-        with open(fasta_path, "w") as f:
-            f.write(f">{prot_id}\n{sequence}\n")
-
+        with open(fasta_path, "w") as f: f.write(f">{prot_id}\n{sequence}\n")
         try:
-            # 2. Run hmmscan
-            # -E 1e-5: Sets a scientifically robust E-value cutoff
-            # --domtblout: Is excellent for domain-based parsing
-            cmd = [
-                "hmmscan", 
-                "--tblout", out_path, 
-                "--noali", 
-                "-E", "1e-5", 
-                self.pfam_path, 
-                fasta_path
-            ]
-            
+            cmd = ["hmmscan", "--tblout", out_path, "--noali", "-E", "1e-5", self.pfam_path, fasta_path]
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            # 3. Parse result
             if os.path.exists(out_path):
                 with open(out_path, "r") as res:
                     for line in res:
                         if not line.startswith("#"):
-                            parts = line.split()
-                            if len(parts) > 0:
-                                return parts[0] # The name of the Pfam domain (e.g., 'Pirin')
-                                
-        except Exception as e:
-            print(f"Error scanning {prot_id}: {e}")
+                            return line.split()[0]
+        except Exception: return None
         finally:
-            # 4. Cleanup temporary files immediately
-            self._cleanup(prot_id)
-        
+            for p in [fasta_path, out_path]:
+                if os.path.exists(p): os.remove(p)
         return None
-
-    def _cleanup(self, prot_id):
-        """Removes temporary files to keep the data directory clean."""
-        for ext in [".fasta", ".txt"]:
-            path = f"data/temp_{prot_id}{ext}"
-            if os.path.exists(path):
-                os.remove(path)
