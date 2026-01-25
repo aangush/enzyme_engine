@@ -1,4 +1,5 @@
 import os
+import time
 from Bio import Entrez, SeqIO
 from dotenv import load_dotenv
 
@@ -8,15 +9,19 @@ Entrez.api_key = os.getenv("NCBI_API_KEY")
 
 class NCBIClient:
     def get_locations(self, protein_id):
-        print(f"📡 Querying NCBI for {protein_id}...")
-        locations = self._get_ipg_locations(protein_id)
-        if not locations:
-            locations = self._get_direct_locations(protein_id)
-        return locations
+        # We wrap the dispatcher to ensure one bad lookup doesn't freeze the caller
+        try:
+            locations = self._get_ipg_locations(protein_id)
+            if not locations:
+                locations = self._get_direct_locations(protein_id)
+            return locations
+        except Exception as e:
+            print(f"⚠️ Dispatcher error for {protein_id}: {e}")
+            return []
 
     def _get_ipg_locations(self, protein_id):
         try:
-            handle = Entrez.efetch(db="protein", id=protein_id, rettype="ipg", retmode="xml")
+            handle = Entrez.efetch(db="protein", id=protein_id, rettype="ipg", retmode="xml", timeout=30)
             raw_data = Entrez.read(handle)
             handle.close()
             locations = []
@@ -27,11 +32,13 @@ class NCBIClient:
                 else:
                     self._extract_cds_ipg(report, locations)
             return locations
-        except: return []
+        except Exception: 
+            return []
 
     def _get_direct_locations(self, protein_id):
         try:
-            handle = Entrez.efetch(db="protein", id=protein_id, rettype="gp", retmode="text")
+            # FIX: Added timeout here. Without this, giant GenBank files hang the script.
+            handle = Entrez.efetch(db="protein", id=protein_id, rettype="gp", retmode="text", timeout=45)
             record = SeqIO.read(handle, "genbank")
             handle.close()
             locations = []
@@ -46,21 +53,35 @@ class NCBIClient:
                         coords = coord_str.split("..")
                         locations.append({'nuc_acc': nuc_acc, 'start': int(coords[0]), 'end': int(coords[1]), 'strand': strand})
             return locations
-        except: return []
+        except: 
+            return []
 
     def _extract_cds_ipg(self, protein_data, locations_list):
         if not isinstance(protein_data, dict): return
         cds_list = protein_data.get('CDSList', [])
         for cds in cds_list:
             attr = cds.attributes if hasattr(cds, 'attributes') else cds
-            locations_list.append({'nuc_acc': attr.get('accver'), 'start': int(attr.get('start', 0)), 'end': int(attr.get('stop', 0)), 'strand': 1 if attr.get('strand') == '+' else -1})
+            locations_list.append({
+                'nuc_acc': attr.get('accver'), 
+                'start': int(attr.get('start', 0)), 
+                'end': int(attr.get('stop', 0)), 
+                'strand': 1 if attr.get('strand') == '+' else -1
+            })
 
-    # Fetch the genomic neighborhood for a +- 10kb window from each BLAST hit
     def fetch_neighborhood(self, nuc_acc, start, end, window=10000):
         f_start, f_end = max(1, start - window), end + window
-        try:
-            handle = Entrez.efetch(db="nuccore", id=nuc_acc, seq_start=f_start, seq_stop=f_end, rettype="gbwithparts", retmode="text")
-            record = SeqIO.read(handle, "genbank")
-            handle.close()
-            return record
-        except: return None
+        # Added a small retry loop for network stability
+        for attempt in range(2):
+            try:
+                handle = Entrez.efetch(db="nuccore", id=nuc_acc, seq_start=f_start, seq_stop=f_end, 
+                                       rettype="gbwithparts", retmode="text", timeout=60)
+                record = SeqIO.read(handle, "genbank")
+                handle.close()
+                return record
+            except Exception as e:
+                if attempt == 0:
+                    print(f"🔄 Retrying {nuc_acc}...")
+                    time.sleep(2)
+                else:
+                    print(f"⚠️ Timeout fetching neighborhood for {nuc_acc}. Skipping.")
+        return None
