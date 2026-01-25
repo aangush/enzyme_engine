@@ -9,20 +9,20 @@ class DomainAnalyzer:
         self.pfam_path = pfam_path
 
     def _get_identity(self, a, b):
-        """Quick sequence identity ratio."""
+        """Calculates sequence identity ratio."""
         return SequenceMatcher(None, a, b).ratio()
 
     def analyze_hypotheticals(self):
         print("\n" + "="*70)
-        print("HYBRID SYNTENY-IDENTITY ANALYSIS")
+        print("SEQUENCE-BASED NO PFAM CLUSTERING (70% IDENTITY)")
         print("="*70)
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # 1. Fetch un-analyzed targets
+        # Fetch targets: Must have sequence, must not have been processed
         cursor.execute("""
-            SELECT id, protein_id, sequence, distance_bp 
+            SELECT id, protein_id, sequence 
             FROM neighbors 
             WHERE (LOWER(product) LIKE '%hypothetical%' OR LOWER(product) = 'unknown') 
             AND sequence != '' AND product NOT LIKE '%(%'
@@ -30,46 +30,43 @@ class DomainAnalyzer:
         targets = cursor.fetchall()
         
         if not targets:
-            print("No new sequences found.")
+            print("No new un-analyzed sequences found.")
             conn.close()
             return
 
-        # Tracking for identity-based clustering of mysteries
-        # Key: (bin_dist, len_bucket) -> List of sequences
-        mystery_clusters = {} 
+        # key: cluster_index -> representative_sequence
+        mystery_representatives = {} 
+        next_cluster_id = 1
 
-        for db_id, prot_id, seq, dist in targets:
+        print(f"Processing {len(targets)} targets...")
+
+        for db_id, prot_id, seq in targets:
             domain = self._scan_sequence(prot_id, seq)
             
             if domain:
                 new_product = f"Hypothetical ({domain})"
             else:
-                # SPATIAL + LENGTH BINNING
-                binned_dist = round(dist / 1000) * 1000
-                len_bucket = round(len(seq) / 50) * 50
-                cluster_key = (binned_dist, len_bucket)
+                # SEQUENCE IDENTITY CLUSTERING
+                assigned_cluster = None
                 
-                # IDENTITY CHECK
-                cluster_match = False
-                if cluster_key in mystery_clusters:
-                    for rep_seq in mystery_clusters[cluster_key]:
-                        if self._get_identity(seq, rep_seq) > 0.90:
-                            cluster_match = True
-                            break
+                for cid, rep_seq in mystery_representatives.items():
+                    if self._get_identity(seq, rep_seq) >= 0.70:
+                        assigned_cluster = cid
+                        break
                 
-                if not cluster_match:
-                    if cluster_key not in mystery_clusters:
-                        mystery_clusters[cluster_key] = []
-                    mystery_clusters[cluster_key].append(seq)
+                if assigned_cluster is None:
+                    assigned_cluster = next_cluster_id
+                    mystery_representatives[assigned_cluster] = seq
+                    next_cluster_id += 1
                 
-                prefix = "+" if binned_dist >= 0 else ""
-                new_product = f"Hypothetical (No Pfam Hit) @ {prefix}{binned_dist}bp | ~{len_bucket}aa"
+                # Tagging by Cluster ID instead of distance
+                new_product = f"Hypothetical (Mystery Cluster {assigned_cluster})"
             
             cursor.execute("UPDATE neighbors SET product = ? WHERE id = ?", (new_product, db_id))
         
         conn.commit()
         conn.close()
-        print("Analysis complete. Mystery clusters merged by location and identity.")
+        print(f"Complete. Grouped mystery proteins into {next_cluster_id - 1} sequence clusters.")
 
     def _scan_sequence(self, prot_id, sequence):
         fasta_path = f"data/temp_{prot_id}.fasta"
