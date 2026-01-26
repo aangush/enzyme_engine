@@ -35,7 +35,7 @@ This project was inspired by my experiences (and frustrations) working with poor
 4. Report a synteny summary with frequency, avg distance, spread of distances, strand, and avg size of neighbors for easy viewing.
 
 
-**Example output with X input protein for 200 BLAST hits:**
+### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from *Piscinibacter sakaiensis* for 200 BLAST hits:**
 
 
 **Output Interpretation:**

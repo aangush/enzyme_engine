@@ -17,20 +17,24 @@ def run_gnn_scout(input_fasta_path, hit_limit=100):
     db = ScoutDB()
     
     if not os.path.exists(input_fasta_path):
-        print(f"❌ Input file {input_fasta_path} not found.")
+        print(f"Input file {input_fasta_path} not found.")
         return
 
     with open(input_fasta_path, "r") as f:
         fasta_str = f.read()
 
     # 1. DISCOVERY
-    homolog_ids = discovery.find_homologs(fasta_str, hit_limit=hit_limit)
+    homolog_ids, identities = discovery.find_homologs(fasta_str, hit_limit=hit_limit)
 
-    # 2. SEARCHING
-    print(f"🚀 Starting scout for {len(homolog_ids)} homologs. (Press Ctrl+C once to skip a stuck ID)")
+    # Display BLAST Distribution
+    if identities:
+        display_blast_metrics(identities)
+
+    # 2. GNN SEARCHING
+    print(f"Starting scout for {len(homolog_ids)} homologs. (Press Ctrl+C once to skip a stuck ID)")
     for i, pid in enumerate(homolog_ids, 1):
         try:
-            # INNER SHIELD: Catches Ctrl+C to allow manual skipping of stalled network calls
+            # Catches Ctrl+C to allow manual skipping of stalled network calls
             try:
                 print(f"[{i}/{len(homolog_ids)}] Processing {pid}...")
                 
@@ -41,7 +45,7 @@ def run_gnn_scout(input_fasta_path, hit_limit=100):
                 loc['anchor_id'] = pid 
             
                 if db.instance_exists(pid, loc['nuc_acc']):
-                    print(f"⏩ Already in database.")
+                    print(f"Already in database.")
                     continue
 
                 record = client.fetch_neighborhood(loc['nuc_acc'], loc['start'], loc['end'])
@@ -49,24 +53,50 @@ def run_gnn_scout(input_fasta_path, hit_limit=100):
                 if record:
                     instance_id = db.add_instance(pid, loc['nuc_acc'], loc['start'], loc['end'], loc['strand'])
                     extract_and_save_neighbors(record, instance_id, loc, db)
-                    print(f"✅ Neighborhood for {pid} saved.")
+                    print(f"Neighborhood for {pid} saved.")
 
             except KeyboardInterrupt:
-                print(f"\n🛑 Manual skip triggered for {pid}. Moving to next...")
+                print(f"\nManual skip triggered for {pid}. Moving to next...")
                 time.sleep(1) # Brief pause to clear the signal buffer
                 continue
 
         except Exception as e:
-            print(f"❌ Unexpected error on {pid}: {e}")
+            print(f"Unexpected error on {pid}: {e}")
             continue
 
     # 3. DOMAIN ANALYSIS
-    print("\n🕵️ Starting Post-Processing: Domain Analysis...")
+    print("\nStarting Post-Processing: Domain Analysis...")
     analyzer = DomainAnalyzer(db_path="data/scout.db")
     analyzer.analyze_hypotheticals()
 
     # 4. REPORT
     generate_summary_report()
+
+
+def display_blast_metrics(identities):
+    # Calculate and display basic distribution of BLAST % Identities
+
+    hi = max(identities)
+    lo = min(identities)
+    avg = sum(identities) / len(identities)
+
+    print("\n" + "-"*60)
+    print(f"Initial BLAST Info (n={len(identities)})")
+    print(f"Range: {lo:.1f}% - {hi:.1f}% Identity | Average: {avg:.1f}%")
+
+    # ASCII Distribution (Binned by 10%)
+    bins = {90:0, 80:0, 70:0, 60:0, 50:0, 40:0, 30:0, 20:0}
+    for ident in identities:
+        for b in sorted(bins.keys(), reverse=True):
+            if ident >= b:
+                bins[b] += 1
+                break
+
+    print("\n% Identity Distribution:")
+    for b, count in sorted(bins.items(), reverse=True):
+        bar = "█" * int(count / (len(identities)/20)) if count > 0 else ""
+        print(f"  {b}%+: {count:<4} {bar}")
+    print("-" * 60 + "\n")
 
 def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
     anchor_id = loc.get('anchor_id')
@@ -98,7 +128,7 @@ def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
 
 def generate_summary_report():
     print("\n" + "="*115)
-    print("📊 GENOMIC NEIGHBORHOOD REPORT")
+    print("GENOMIC NEIGHBORHOOD REPORT")
     print("="*115)
     
     conn = sqlite3.connect("data/scout.db")
