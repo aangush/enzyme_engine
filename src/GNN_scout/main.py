@@ -71,7 +71,6 @@ def run_gnn_scout(input_fasta_path, hit_limit=100):
 
     # 4. REPORT
     generate_summary_report()
-    report_multiplexed_modules()
     
 
 
@@ -129,16 +128,19 @@ def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
             db.add_neighbor(instance_id, prot_id, product, dist, direction, translation)
 
 def generate_summary_report():
-    print("\n" + "="*115)
-    print("GENOMIC NEIGHBORHOOD REPORT")
-    print("="*115)
+    print("\n" + "="*145)
+    print(f"{'GENOMIC NEIGHBORHOOD & CO-OCCURRENCE REPORT':^145}")
+    print("="*145)
     
     conn = sqlite3.connect("data/scout.db")
     cursor = conn.cursor()
     
+    # 1. Main Neighbor Report with Representative Accession
+    # We use MAX(protein_id) to just grab one valid accession as an example
     query = """
     SELECT 
         product, 
+        MAX(protein_id) as example_acc,
         direction, 
         COUNT(*) as freq, 
         CAST(AVG(distance_bp) AS INT) as avg_dist,
@@ -148,52 +150,54 @@ def generate_summary_report():
     GROUP BY product, direction
     HAVING freq >= 2
     ORDER BY freq DESC 
-    LIMIT 100
+    LIMIT 40
     """
     cursor.execute(query)
     results = cursor.fetchall()
     
-    print(f"{'Neighbor Product':<50} | {'Strand':<8} | {'Freq':<5} | {'Avg Dist':<12} | {'Spread':<8} | {'Avg Len'}")
-    print("-" * 115)
+    # Header with expanded padding for Name + Accession
+    print(f"{'Neighbor Product (Example Accession)':<65} | {'Strand':<8} | {'Freq':<5} | {'Avg Dist':<12} | {'Spread':<8} | {'Len'}")
+    print("-" * 145)
+    
     for row in results:
-        p_name = (row[0][:47] + '..') if len(row[0]) > 47 else row[0]
-        print(f"{p_name:<50} | {row[1]:<8} | {row[2]:<5} | {row[3]:>9} bp | {row[4]:>6} bp | {row[5]}aa")
-    
-    conn.close()
-    print("="*115)
+        # Combine Product Name and Accession for the display string
+        display_name = f"{row[0]} ({row[1]})"
+        # Truncate if too long for the 65-char column
+        display_name = (display_name[:62] + '..') if len(display_name) > 65 else display_name
+        
+        print(f"{display_name:<65} | {row[2]:<8} | {row[3]:<5} | {row[4]:>9} bp | {row[5]:>6} bp | {row[6]}aa")
 
-def report_multiplexed_modules():
-    print("\n" + "="*80)
-    print("MULTIPLEXED MODULE REPORT: CO-OCCURRING NEIGHBORS")
-    print("="*80)
+    # 2. Multiplexed Module (Co-occurrence) Section
+    print("\n" + "-"*60)
+    print("TOP CO-OCCURRING NEIGHBOR PAIRS (Pathway Modules)")
+    print("-"*60)
     
-    conn = sqlite3.connect("data/scout.db")
-    cursor = conn.cursor()
-    
-    # Query finds pairs of neighbors that appear together in the same window
-    query = """
+    co_query = """
     SELECT 
         n1.product AS Neighbor_A, 
         n2.product AS Neighbor_B, 
         COUNT(DISTINCT n1.instance_id) AS CoOccurrence_Freq
     FROM neighbors n1
     JOIN neighbors n2 ON n1.instance_id = n2.instance_id
-    WHERE n1.product < n2.product  -- Prevents duplicate pairs (A-B and B-A)
-    AND n1.product NOT LIKE '%PETase%' -- Optional: focus only on the neighbors
+    WHERE n1.product < n2.product 
+    AND n1.product NOT LIKE '%PETase%' AND n2.product NOT LIKE '%PETase%'
     GROUP BY Neighbor_A, Neighbor_B
-    HAVING CoOccurrence_Freq >= 5  -- Only show signals found in at least 5 genomes
+    HAVING CoOccurrence_Freq >= 3
     ORDER BY CoOccurrence_Freq DESC
-    LIMIT 20
+    LIMIT 15
     """
-    cursor.execute(query)
-    results = cursor.fetchall()
+    cursor.execute(co_query)
+    co_results = cursor.fetchall()
     
-    print(f"{'Neighbor A':<35} | {'Neighbor B':<35} | {'Freq'}")
-    print("-" * 80)
-    for row in results:
-        print(f"{row[0][:34]:<35} | {row[1][:34]:<35} | {row[2]}")
-    
+    if co_results:
+        print(f"{'Module Component A':<40} | {'Module Component B':<40} | {'Freq'}")
+        for crow in co_results:
+            print(f"{crow[0][:39]:<40} | {crow[1][:39]:<40} | {crow[2]}")
+    else:
+        print("No significant co-occurrence modules found yet.")
+        
     conn.close()
+    print("="*145)
 
 if __name__ == "__main__":
     run_gnn_scout("input.fasta", hit_limit=200)
