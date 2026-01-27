@@ -71,6 +71,8 @@ def run_gnn_scout(input_fasta_path, hit_limit=100):
 
     # 4. REPORT
     generate_summary_report()
+    report_multiplexed_modules()
+    
 
 
 def display_blast_metrics(identities):
@@ -160,5 +162,39 @@ def generate_summary_report():
     conn.close()
     print("="*115)
 
+def report_multiplexed_modules():
+    print("\n" + "="*80)
+    print("MULTIPLEXED MODULE REPORT: CO-OCCURRING NEIGHBORS")
+    print("="*80)
+    
+    conn = sqlite3.connect("data/scout.db")
+    cursor = conn.cursor()
+    
+    # Query finds pairs of neighbors that appear together in the same window
+    query = """
+    SELECT 
+        n1.product AS Neighbor_A, 
+        n2.product AS Neighbor_B, 
+        COUNT(DISTINCT n1.instance_id) AS CoOccurrence_Freq
+    FROM neighbors n1
+    JOIN neighbors n2 ON n1.instance_id = n2.instance_id
+    WHERE n1.product < n2.product  -- Prevents duplicate pairs (A-B and B-A)
+    AND n1.product NOT LIKE '%PETase%' -- Optional: focus only on the neighbors
+    GROUP BY Neighbor_A, Neighbor_B
+    HAVING CoOccurrence_Freq >= 5  -- Only show signals found in at least 5 genomes
+    ORDER BY CoOccurrence_Freq DESC
+    LIMIT 20
+    """
+    cursor.execute(query)
+    results = cursor.fetchall()
+    
+    print(f"{'Neighbor A':<35} | {'Neighbor B':<35} | {'Freq'}")
+    print("-" * 80)
+    for row in results:
+        print(f"{row[0][:34]:<35} | {row[1][:34]:<35} | {row[2]}")
+    
+    conn.close()
+
 if __name__ == "__main__":
     run_gnn_scout("input.fasta", hit_limit=200)
+    
