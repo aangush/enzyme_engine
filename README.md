@@ -1,7 +1,8 @@
-# Enzyme Engine by Aidan
+# Enzyme Engine
 
 ### A Comparative Genomics Pipeline for Discovering Functional Gene Modules and Exploring Bacterial Protein Diversity
 
+#### By Aidan
 ---
 
 ## Overview
@@ -35,7 +36,7 @@ This project was inspired by my experiences (and frustrations) working with poor
 4. Report a synteny summary with frequency, avg distance, spread of distances, strand, and avg size of neighbors for easy viewing.
 
 
-### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from *Piscinibacter sakaiensis* for 200 BLAST hits:**
+### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from *Piscinibacter sakaiensis* for 200 BLAST hits:
 
 
 **Output Interpretation:**
@@ -43,6 +44,7 @@ This project was inspired by my experiences (and frustrations) working with poor
 ___
 ## Future Directions and Features
 - Multiple-linkage analysis to move from anchor-neighbor pairs to detecting 3+ conserved modules.
+- Pull existing metabolic pathway data from MetaCyc and search for "missing" proteins also involved for pathway functionality.
 - Phylogenetic and biosample analysis to investigate possible phylogenetic and/or environemntal correlations with protein sequence.
 - Alphafold integration, active site analysis, and possible molecular dynamics simulations to probe for potential functional mutation.
 
