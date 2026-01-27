@@ -20,7 +20,8 @@ This project was inspired by my experiences (and frustrations) working with poor
 - Takes a FASTA formatted protein sequence, and runs a large BLASTp search to find homologs.
 - Uses signed genomic distances to distinguish upstream and downstream neighbors and reveal possible operon orientation.
 - Automatically runs `hmmscan` against a Pfam-A database (locally) to annotate domains in hypothetical proteins.
-- Calculates and displays frequency, avg distance, spread of avg distances, strand, and avg size of genomic neighbors of homologs (="anchor" proteins)
+- Calculates and displays frequency, avg distance, spread of avg distances, strand, and avg size of genomic neighbors of homologs (="anchor" proteins).
+- Finds and reports top co-occuring genomic neighbors to map pathway modules/operons.
 
 ---
 ### Prerequisites
@@ -33,16 +34,16 @@ This project was inspired by my experiences (and frustrations) working with poor
 1. Performs a BLASTp search to identify N homologs of input sequence.
 2. Queries NCBI for the genomic location of each homolog and fetches a +-10kb window.
 3. Scans every hypothetical neighbor against Pfam and cluster remaining hypothetical proteins by sequence identity.
-4. Report a synteny summary with frequency, avg distance, spread of distances, strand, and avg size of neighbors for easy viewing.
+4. Reports a synteny summary with frequency, avg distance, spread of distances, strand, and avg size of neighbors for easy viewing.
+5. Reports a top co-occuring neighbor pair table for given neighbors A and B with frequencies of co-occurrence.
 
 
 ### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from *Piscinibacter sakaiensis* for 200 BLAST hits:
+![example enzyme engine output using PETase protein sequence as input](docs/PETase_example_output.png)
 
-
-**Output Interpretation:**
 
 ___
-## Future Directions and Features
+## Future Directions and Features (In development)
 - Multiple-linkage analysis to move from anchor-neighbor pairs to detecting 3+ conserved modules.
 - Pull existing metabolic pathway data from MetaCyc and search for "missing" proteins also involved for pathway functionality.
 - Phylogenetic and biosample analysis to investigate possible phylogenetic and/or environemntal correlations with protein sequence.
