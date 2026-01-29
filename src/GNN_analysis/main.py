@@ -26,10 +26,6 @@ def run_gnn_scout(input_fasta_path, hit_limit=100):
     # 1. Initial BLAST
     homolog_ids, identities = discovery.find_homologs(fasta_str, hit_limit=hit_limit)
 
-    # Display BLAST Distribution
-    if identities:
-        display_blast_metrics(identities)
-
     # 2. GNN SEARCHING
     print(f"Starting search for {len(homolog_ids)} homologs. (Press Ctrl+C once to skip a stuck ID)")
     for i, pid in enumerate(homolog_ids, 1):
@@ -68,6 +64,11 @@ def run_gnn_scout(input_fasta_path, hit_limit=100):
     print("\nStarting Post-Processing: Domain Analysis...")
     analyzer = DomainAnalyzer(db_path="data/scout.db")
     analyzer.analyze_hypotheticals()
+
+    # 3.5. Display Initial BLAST Summary
+    # Display BLAST Distribution
+    if identities:
+        display_blast_metrics(identities)
 
     # 4. REPORT
     generate_summary_report()
