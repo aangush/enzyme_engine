@@ -16,7 +16,7 @@ class NCBIClient:
                 locations = self._get_direct_locations(protein_id)
             return locations
         except Exception as e:
-            print(f"⚠️ Dispatcher error for {protein_id}: {e}")
+            print(f"Dispatcher error for {protein_id}: {e}")
             return []
 
     def _get_ipg_locations(self, protein_id):
@@ -80,8 +80,8 @@ class NCBIClient:
                 return record
             except Exception as e:
                 if attempt == 0:
-                    print(f"🔄 Retrying {nuc_acc}...")
+                    print(f"Retrying {nuc_acc}...")
                     time.sleep(2)
                 else:
-                    print(f"⚠️ Timeout fetching neighborhood for {nuc_acc}. Skipping.")
+                    print(f"Timeout fetching neighborhood for {nuc_acc}. Skipping.")
         return None

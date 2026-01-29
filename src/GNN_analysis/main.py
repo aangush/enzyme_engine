@@ -23,7 +23,7 @@ def run_gnn_scout(input_fasta_path, hit_limit=100):
     with open(input_fasta_path, "r") as f:
         fasta_str = f.read()
 
-    # 1. DISCOVERY
+    # 1. Initial BLAST
     homolog_ids, identities = discovery.find_homologs(fasta_str, hit_limit=hit_limit)
 
     # Display BLAST Distribution
@@ -31,7 +31,7 @@ def run_gnn_scout(input_fasta_path, hit_limit=100):
         display_blast_metrics(identities)
 
     # 2. GNN SEARCHING
-    print(f"Starting scout for {len(homolog_ids)} homologs. (Press Ctrl+C once to skip a stuck ID)")
+    print(f"Starting search for {len(homolog_ids)} homologs. (Press Ctrl+C once to skip a stuck ID)")
     for i, pid in enumerate(homolog_ids, 1):
         try:
             # Catches Ctrl+C to allow manual skipping of stalled network calls
