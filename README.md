@@ -41,7 +41,9 @@ This project was inspired by my experiences (and frustrations) working with poor
 ### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from *Piscinibacter sakaiensis* for 200 BLAST hits:
 ![example enzyme engine output using PETase protein sequence as input](docs/PETase_example_output.png)
 
-
+- 128 hypothetical proteins in PETase blastp hit genomic neighborhoods, and assigned domains when possible using local hmmscan.
+- Top genomic neighbors of PETase homologs include transporters/permeases, chaperones, other hydrolases, efflux pumps, and transcriptional regulators.
+- Co-occurrence analysis suggests presence of a functional module containing the top genomic neighbors in 5-6 bacterial genomes. Analysis of phyla and expanded homolog searching for more powerful analysis to be added shortly.
 ___
 ## Future Directions and Features (In development)
 - Multiple-linkage analysis to move from anchor-neighbor pairs to detecting 3+ conserved modules.
