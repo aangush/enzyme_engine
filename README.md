@@ -46,7 +46,7 @@ ___
 ## Future Directions and Features (In development)
 - Multiple-linkage analysis to move from anchor-neighbor pairs to detecting 3+ conserved modules.
 - Pull existing metabolic pathway data from MetaCyc and search for "missing" proteins also involved for pathway functionality.
-- Phylogenetic and biosample analysis to investigate possible phylogenetic and/or environemntal correlations with protein sequence.
+- Phylogenetic and biosample analysis to investigate possible phylogenetic and/or environmental correlations with protein sequence.
 - Alphafold integration, active site analysis, and possible molecular dynamics simulations to probe for potential functional mutation.
 
 
