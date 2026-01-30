@@ -8,8 +8,10 @@ __pycache__/
 # Bioinformatics data
 *.gbk
 *.fasta
+*.xml
 data/
 results/
+
 
 # MacOS System Files
 .DS_Store

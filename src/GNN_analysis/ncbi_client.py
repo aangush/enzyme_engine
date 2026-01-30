@@ -9,7 +9,7 @@ Entrez.api_key = os.getenv("NCBI_API_KEY")
 
 class NCBIClient:
     def get_locations(self, protein_id):
-        # We wrap the dispatcher to ensure one bad lookup doesn't freeze the caller
+        # W rap the dispatcher to ensure one bad lookup doesn't freeze the caller
         try:
             locations = self._get_ipg_locations(protein_id)
             if not locations:
