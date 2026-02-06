@@ -9,7 +9,7 @@ Entrez.api_key = os.getenv("NCBI_API_KEY")
 
 class NCBIClient:
     def get_locations(self, protein_id):
-        # W rap the dispatcher to ensure one bad lookup doesn't freeze the caller
+        # Wrap the dispatcher to ensure one bad lookup doesn't freeze the caller
         try:
             locations = self._get_ipg_locations(protein_id)
             if not locations:
@@ -21,7 +21,7 @@ class NCBIClient:
 
     def _get_ipg_locations(self, protein_id):
         try:
-            handle = Entrez.efetch(db="protein", id=protein_id, rettype="ipg", retmode="xml", timeout=30)
+            handle = Entrez.efetch(db="protein", id=protein_id, rettype="ipg", retmode="xml", timeout=45)
             raw_data = Entrez.read(handle)
             handle.close()
             locations = []
@@ -37,7 +37,7 @@ class NCBIClient:
 
     def _get_direct_locations(self, protein_id):
         try:
-            # FIX: Added timeout here. Without this, giant GenBank files hang the script.
+            # FIX: Added timeout here. Without this, giant GenBank files hang the script
             handle = Entrez.efetch(db="protein", id=protein_id, rettype="gp", retmode="text", timeout=45)
             record = SeqIO.read(handle, "genbank")
             handle.close()
