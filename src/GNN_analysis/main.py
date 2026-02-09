@@ -55,7 +55,7 @@ def run_gnn_scout(input_fasta_path, hit_limit=200):
 
     # 3. DOMAIN ANALYSIS
     print("\nStarting Post-Processing: Domain Analysis...")
-    analyzer = DomainAnalyzer(db_path="data/scout.db")
+    analyzer = DomainAnalyzer(db_path="data/GNN.db")
     analyzer.analyze_hypotheticals()
 
     # 3.5. Display Initial BLAST Summary
@@ -126,7 +126,7 @@ def generate_summary_report():
     print(f"{'GENOMIC NEIGHBORHOOD & CO-OCCURRENCE REPORT':^145}")
     print("="*145)
     
-    conn = sqlite3.connect("data/scout.db")
+    conn = sqlite3.connect("data/GNN.db")
     cursor = conn.cursor()
     
     # 1. Main Neighbor Report with Representative Accession

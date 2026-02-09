@@ -4,7 +4,7 @@ import os
 from Bio import Align
 
 class DomainAnalyzer:
-    def __init__(self, db_path="data/scout.db", pfam_path="data/pfam/Pfam-A.hmm"):
+    def __init__(self, db_path="data/GNN.db", pfam_path="data/pfam/Pfam-A.hmm"):
         self.db_path = db_path
         self.pfam_path = pfam_path
 
