@@ -1,8 +1,8 @@
 import sqlite3
 import os
 
-class ScoutDB:
-    def __init__(self, db_path="data/scout.db"):
+class GNNDB:
+    def __init__(self, db_path="data/GNN.db"):
         self.db_path = db_path
         self._initialize_db()
 

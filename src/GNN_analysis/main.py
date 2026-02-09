@@ -3,22 +3,15 @@ import sys
 import sqlite3
 import time
 
-# Ensure local imports work
-sys.path.append(os.path.dirname(__file__))
-
 from discovery import DiscoveryEngine
 from ncbi_client import NCBIClient
-from db_manager import ScoutDB
+from db_manager import GNNDB
 from domain_analyzer import DomainAnalyzer
 
-def run_gnn_scout(input_fasta_path, hit_limit=100):
+def run_gnn_scout(input_fasta_path, hit_limit=200):
     discovery = DiscoveryEngine()
     client = NCBIClient()
-    db = ScoutDB()
-    
-    if not os.path.exists(input_fasta_path):
-        print(f"Input file {input_fasta_path} not found.")
-        return
+    db = GNNDB()
 
     with open(input_fasta_path, "r") as f:
         fasta_str = f.read()

@@ -1,20 +1,33 @@
 import sqlite3
 import subprocess
 import os
-from difflib import SequenceMatcher
+from Bio import Align
 
 class DomainAnalyzer:
     def __init__(self, db_path="data/scout.db", pfam_path="data/pfam/Pfam-A.hmm"):
         self.db_path = db_path
         self.pfam_path = pfam_path
 
+        #Initialize aligner and matrix
+        self.aligner = Align.PairwiseAligner(mode="global")
+        self.aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
+
+
     def _get_identity(self, a, b):
-        """Calculates sequence identity ratio."""
-        return SequenceMatcher(None, a, b).ratio()
+        # Get BLOSUM62 raw alignment score
+        raw_score = self.aligner.score(a, b)
+
+        # Calculate max score and define shorter sequence for normalization
+        shorter = a if len(a) < len(b) else b
+        max_score = self.aligner.score(shorter, shorter)
+
+        # Normalize alignment score
+        if max_score == 0: return 0.0
+        return raw_score / max_score
 
     def analyze_hypotheticals(self):
         print("\n" + "="*70)
-        print("SEQUENCE-BASED NO PFAM CLUSTERING (70% IDENTITY)")
+        print("SEQUENCE-BASED NO PFAM CLUSTERING ()")
         print("="*70)
         
         conn = sqlite3.connect(self.db_path)
@@ -46,7 +59,7 @@ class DomainAnalyzer:
             if domain:
                 new_product = f"Hypothetical ({domain})"
             else:
-                # SEQUENCE IDENTITY CLUSTERING
+                # SEQUENCE IDENTITY CLUSTERING to approx. 70% (BLOSUM62 normalized by shorter seq length
                 assigned_cluster = None
                 
                 for cid, rep_seq in mystery_representatives.items():
