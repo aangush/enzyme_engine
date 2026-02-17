@@ -12,7 +12,7 @@ Enzyme Engine is a bioinformatics tool designed to find and map genomic neighbor
 
 ---
 
-This project was inspired by the technical limitations and bottlenecks I encountered working with poorly characterized biochemcial pathways for metabolic engineering, and by my use of the [Enzyme Function Initiative Tools](https://efi.igb.illinois.edu/). It is my attempt to streamline, optimize, and expand on comparative genomic context searching to discover functional "accessory" proteins for a pathway of interest.
+This project was inspired by the technical limitations and bottlenecks I encountered working with poorly characterized biochemical pathways for metabolic engineering, and by my use of the [Enzyme Function Initiative Tools](https://efi.igb.illinois.edu/). It is an attempt to streamline, optimize, and expand on comparative genomic context searching to discover functional "accessory" proteins for a pathway of interest.
 
 _Furthermore, this project was motivated by a desire to leverage comparative genomic and environmental context to characterize and harness biodiversity, offering a targeted alternative to black-box predictive models trained on insufficient data._
 
@@ -24,7 +24,7 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 - Uses signed genomic distances to distinguish upstream and downstream neighbors of anchor proteins, and reveal possible operon orientation.
 - Automatically runs `hmmscan` against a Pfam-A database (locally) to annotate domains in hypothetical proteins.
 - Calculates and displays frequency, avg distance, spread of avg distances, strand, and avg size of genomic neighbors of homologs (="anchor" proteins).
-- Finds and reports top co-occuring genomic neighbors to map pathway modules/operons.
+- Finds and reports top co-occurring genomic neighbors to map pathway modules/operons.
 
 ---
 
@@ -41,7 +41,7 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 2. Queries NCBI for the genomic location of each homolog, and fetches a +-10kb window.
 3. Scans every hypothetical neighbor against Pfam and cluster remaining hypothetical proteins by sequence identity.
 4. Reports a synteny summary with frequency, avg distance, spread of distances, strand, and avg size of neighbors for easy viewing.
-5. Reports a top co-occuring neighbor pair table for given neighbors A and B with frequencies of co-occurrence.
+5. Reports a top co-occurring neighbor pair table for given neighbors A and B with frequencies of co-occurrence.
 
 ### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from _Piscinibacter sakaiensis_ for 200 BLAST hits:
 
