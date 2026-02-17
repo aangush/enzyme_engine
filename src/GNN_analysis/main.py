@@ -121,6 +121,40 @@ def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
             
             db.add_neighbor(instance_id, prot_id, product, dist, direction, translation)
 
+def suggest_module(co_results):
+    # Build a map of protein neighbors from co-occurrence data
+    neighbors_map = {}
+
+    for a, b, _ in co_results:
+        if a not in neighbors_map:
+            neighbors_map[a] = set()
+        if b not in neighbors_map:
+            neighbors_map[b] = set()
+
+        neighbors_map[a].add(b)
+        neighbors_map[b].add(a)
+
+    # Walk map to find connected groups
+    visited = set()
+    all_modules = []
+
+    for protein in neighbors_map:
+        if protein not in visited:
+            current_module = set()
+            stack = [protein]
+
+            while stack:
+                node = stack.pop()
+                if node not in visited:
+                    visited.add(node)
+                    current_module.add(node)
+                    stack.extend(neighbors_map - visited)
+
+            all_modules.append(current_module)
+
+    return all_modules
+        
+    
 def generate_summary_report():
     print("\n" + "="*145)
     print(f"{'GENOMIC NEIGHBORHOOD & CO-OCCURRENCE REPORT':^145}")
@@ -191,6 +225,14 @@ def generate_summary_report():
         
     conn.close()
     print("="*145)
+
+    modules = suggest_module(co_results)
+
+    if modules:
+        print("\n--- Putative Functional Modules (Operons) ---")
+        for i, mod in enumerate(modules, 1):
+        # Joining the set into a readable string
+            print(f"Module {i}: {', '.join(mod)}")
 
 if __name__ == "__main__":
     run_gnn_scout("input.fasta", hit_limit=200)
