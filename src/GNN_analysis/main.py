@@ -31,7 +31,7 @@ def run_gnn_scout(input_fasta_path, hit_limit=200):
                 if not locations: continue
             
                 loc = locations[0]
-                loc['anchor_id'] = pid 
+                loc['anchor_id'] = pid
             
                 if db.instance_exists(pid, loc['nuc_acc']):
                     print(f"Already in database.")
@@ -161,7 +161,7 @@ def generate_summary_report():
         
         print(f"{display_name:<65} | {row[2]:<8} | {row[3]:<5} | {row[4]:>9} bp | {row[5]:>6} bp | {row[6]}aa")
 
-    # 2. Multiplexed Module (Co-occurrence) Section
+    # 2. (Co-occurrence) Section
     print("\n" + "-"*60)
     print("TOP CO-OCCURRING NEIGHBOR PAIRS (Pathway Modules)")
     print("-"*60)
@@ -174,7 +174,6 @@ def generate_summary_report():
     FROM neighbors n1
     JOIN neighbors n2 ON n1.instance_id = n2.instance_id
     WHERE n1.product < n2.product 
-    AND n1.product NOT LIKE '%PETase%' AND n2.product NOT LIKE '%PETase%'
     GROUP BY Neighbor_A, Neighbor_B
     HAVING CoOccurrence_Freq >= 3
     ORDER BY CoOccurrence_Freq DESC
