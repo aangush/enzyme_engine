@@ -2,7 +2,7 @@
 
 ### A Comparative Genomics Pipeline for Discovering Functional Gene Modules and Exploring Bacterial Protein Diversity
 
-#### By Aidan
+#### **Author: Aidan William Angus-Henry**
 
 ---
 
@@ -12,7 +12,7 @@ Enzyme Engine is a bioinformatics tool designed to find and map genomic neighbor
 
 ---
 
-This project was inspired by my experiences (and frustrations) working with poorly characterized biochemcial pathways for metabolic engineering, and by my use of the wonderful [Enzyme Function Initiative Tools](https://efi.igb.illinois.edu/). It is my attempt to streamline, optimize, and expand on comparative genomic context searching to discover functional proteins for a pathway of interest.
+This project was inspired by the technical limitations and bottlenecks I encountered working with poorly characterized biochemcial pathways for metabolic engineering, and by my use of the [Enzyme Function Initiative Tools](https://efi.igb.illinois.edu/). It is my attempt to streamline, optimize, and expand on comparative genomic context searching to discover functional "accessory" proteins for a pathway of interest.
 
 _Furthermore, this project was motivated by a desire to leverage comparative genomic and environmental context to characterize and harness biodiversity, offering a targeted alternative to black-box predictive models trained on insufficient data._
 
