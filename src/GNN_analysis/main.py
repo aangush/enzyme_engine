@@ -148,7 +148,7 @@ def suggest_module(co_results):
                 if node not in visited:
                     visited.add(node)
                     current_module.add(node)
-                    stack.extend(neighbors_map - visited)
+                    stack.extend(neighbors_map[node] - visited)
 
             all_modules.append(current_module)
 
@@ -229,7 +229,7 @@ def generate_summary_report():
     modules = suggest_module(co_results)
 
     if modules:
-        print("\n--- Putative Functional Modules (Operons) ---")
+        print("\n--- Putative Functional Modules ---")
         for i, mod in enumerate(modules, 1):
         # Joining the set into a readable string
             print(f"Module {i}: {', '.join(mod)}")
