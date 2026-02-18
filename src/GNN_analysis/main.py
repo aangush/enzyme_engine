@@ -68,59 +68,76 @@ def run_gnn_scout(input_fasta_path, hit_limit=200):
     # 4. REPORT
     generate_summary_report()
     
-def identify_modules(raw_results, min_support = 3, min_module_size=3):
+
+def get_maximal_modules(raw_results, min_support=3, min_module_size=4):
     """
-    Identifies modules based on actual simultaneous co-occurrence in the same instance.
-    
-    Args:
-        raw_results: List of (instance_id, product) tuples.
-        min_support: Minimum number of distinct instances the WHOLE module must appear in.
-        min_module_size: Minimum number of genes to consider a module.
+    Identifies functional modules and removes redundant subsets.
     """
-    
     # 1. Reconstruct Neighborhoods
-    # Map: instance_id -> set of proteins
     neighborhoods = defaultdict(set)
     for instance_id, product in raw_results:
         neighborhoods[instance_id].add(product)
-    
-    # 2. Count "Itemsets" (Co-occurring groups)
-    # We look for groups of genes that appear together in the distinct neighborhoods.
-    # Note: For very large neighborhoods (>20 genes), iterating all combinations can be slow.
-    # tailored here for typical BGC/operon sizes.
-    
+
+    # 2. Count All Combinations (The "Raw" list)
     itemset_counts = Counter()
     
     for neighbors in neighborhoods.values():
-        # Only analyze neighborhoods that have enough genes to form a module
         if len(neighbors) < min_module_size:
             continue
             
-        # Sort to ensure tuple (A, B, C) is same as (C, B, A)
+        # Optimization: Limit neighborhood size to prevent crashing on massive super-clusters
+        # If a neighborhood has 50 genes, 50-choose-3 is huge. We cap it or filter junk first.
         sorted_neighbors = sorted(list(neighbors))
-        
-        # Count all possible sub-combinations of valid size
-        # If A, B, C, D are in a sample, we count {A,B,C}, {A,B,D}, {A,B,C,D}, etc.
-        # This ensures we catch the module even if there is an extra "noise" gene in one sample.
+        if len(sorted_neighbors) > 20: 
+             # Optional: skip massive non-specific clusters if necessary
+             continue 
+
+        # We still generate combinations to catch cases where a module is 
+        # embedded in a larger, noisy neighborhood.
         for r in range(min_module_size, len(sorted_neighbors) + 1):
              for combo in combinations(sorted_neighbors, r):
                  itemset_counts[combo] += 1
 
-    # 3. Filter by Support (Frequency)
-    # This filters out random noise. We only want groups that travel together often.
-    verified_modules = [
-        (genes, count) 
-        for genes, count in itemset_counts.items() 
-        if count >= min_support
-    ]
+    # 3. Initial Filter by Frequency
+    candidates = []
+    for genes, count in itemset_counts.items():
+        if count >= min_support:
+            # Store as set for easy subset checking, but keep tuple for display
+            candidates.append({'genes': set(genes), 'count': count, 'display': genes})
+
+    # 4. REMOVE SUBSETS (The Fix)
+    # Sort candidates by size (largest first). 
+    # If a smaller candidate is a subset of a larger one AND has the same frequency, drop it.
     
-    # 4. Pruning (Optional but Recommended)
-    # If we have module {A, B, C} with freq 10, and {A, B} with freq 12,
-    # {A, B} is redundant if it mostly exists only as part of {A, B, C}.
-    # For now, let's just sort by size and frequency to show the largest, most robust modules first.
-    verified_modules.sort(key=lambda x: (-len(x[0]), -x[1]))
+    candidates.sort(key=lambda x: len(x['genes']), reverse=True)
+    final_modules = []
     
-    return verified_modules
+    for i, candidate in enumerate(candidates):
+        is_redundant = False
+        
+        # Check against all already accepted "larger" modules
+        for larger_mod in final_modules:
+            # LOGIC:
+            # If the current candidate is a subset of a larger module...
+            if candidate['genes'].issubset(larger_mod['genes']):
+                # ...AND the frequencies are roughly the same (meaning they always occur together)
+                # We use a slight tolerance (e.g. within 90%) to be safe, or strict equality.
+                # Strict equality is usually best for "perfect" modules.
+                if candidate['count'] == larger_mod['count']:
+                    is_redundant = True
+                    break
+        
+        if not is_redundant:
+            final_modules.append(candidate)
+
+    # 5. Final Sort for Display (Highest Frequency first, then Largest Size)
+    final_modules.sort(key=lambda x: (-x['count'], -len(x['genes'])))
+
+    # For now, take top 10 modules sorted by frequency to simplify output
+
+    top_modules = final_modules[:10]
+    
+    return top_modules
 
 
 def display_blast_metrics(identities):
@@ -245,7 +262,7 @@ def generate_summary_report():
     else:
         print("No significant co-occurrence modules found yet.")
 
-    # 3. Look for functional modules that co-occur together.
+    # 3. Look for functional modules that co-occur together, todo: move into main gnn scount function
     raw_query = """
     SELECT
         instance_id,
@@ -256,11 +273,21 @@ def generate_summary_report():
     cursor.execute(raw_query)
     raw_results = cursor.fetchall()
 
-    modules = identify_modules(raw_results, min_support=3, min_module_size=3)
+    modules = get_maximal_modules(raw_results, min_support=3, min_module_size=3)
 
-    print("\n--- Verified Functional Modules (Strict Co-occurrence) ---")
-    for genes, count in modules:
-        print(f"Freq: {count} | Genes: {', '.join(genes)}")
+    print("\n" + "="*80)
+    print("TOP 10 VERIFIED FUNCTIONAL MODULES BY FREQ (Maximal Sets Only)")
+    print("="*80)
+
+    if not modules:
+        print("No modules found matching criteria.")
+    else:
+        for i, mod in enumerate(modules, 1):
+            print(f"{i}. [Freq: {mod['count']}] Size: {len(mod['genes'])}")
+            # Cleaning up the gene list string for readability
+            clean_genes = ', '.join(sorted(list(mod['genes'])))
+            print(f"   Genes: {clean_genes}")
+            print("-" * 40)
     
         
     conn.close()
