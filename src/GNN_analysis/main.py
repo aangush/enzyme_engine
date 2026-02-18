@@ -2,6 +2,8 @@ import os
 import sys
 import sqlite3
 import time
+from collections import defaultdict, Counter
+from itertools import combinations
 
 from discovery import DiscoveryEngine
 from ncbi_client import NCBIClient
@@ -66,6 +68,59 @@ def run_gnn_scout(input_fasta_path, hit_limit=200):
     # 4. REPORT
     generate_summary_report()
     
+def identify_modules(raw_results, min_support = 3, min_module_size=3):
+    """
+    Identifies modules based on actual simultaneous co-occurrence in the same instance.
+    
+    Args:
+        raw_results: List of (instance_id, product) tuples.
+        min_support: Minimum number of distinct instances the WHOLE module must appear in.
+        min_module_size: Minimum number of genes to consider a module.
+    """
+    
+    # 1. Reconstruct Neighborhoods
+    # Map: instance_id -> set of proteins
+    neighborhoods = defaultdict(set)
+    for instance_id, product in raw_results:
+        neighborhoods[instance_id].add(product)
+    
+    # 2. Count "Itemsets" (Co-occurring groups)
+    # We look for groups of genes that appear together in the distinct neighborhoods.
+    # Note: For very large neighborhoods (>20 genes), iterating all combinations can be slow.
+    # tailored here for typical BGC/operon sizes.
+    
+    itemset_counts = Counter()
+    
+    for neighbors in neighborhoods.values():
+        # Only analyze neighborhoods that have enough genes to form a module
+        if len(neighbors) < min_module_size:
+            continue
+            
+        # Sort to ensure tuple (A, B, C) is same as (C, B, A)
+        sorted_neighbors = sorted(list(neighbors))
+        
+        # Count all possible sub-combinations of valid size
+        # If A, B, C, D are in a sample, we count {A,B,C}, {A,B,D}, {A,B,C,D}, etc.
+        # This ensures we catch the module even if there is an extra "noise" gene in one sample.
+        for r in range(min_module_size, len(sorted_neighbors) + 1):
+             for combo in combinations(sorted_neighbors, r):
+                 itemset_counts[combo] += 1
+
+    # 3. Filter by Support (Frequency)
+    # This filters out random noise. We only want groups that travel together often.
+    verified_modules = [
+        (genes, count) 
+        for genes, count in itemset_counts.items() 
+        if count >= min_support
+    ]
+    
+    # 4. Pruning (Optional but Recommended)
+    # If we have module {A, B, C} with freq 10, and {A, B} with freq 12,
+    # {A, B} is redundant if it mostly exists only as part of {A, B, C}.
+    # For now, let's just sort by size and frequency to show the largest, most robust modules first.
+    verified_modules.sort(key=lambda x: (-len(x[0]), -x[1]))
+    
+    return verified_modules
 
 
 def display_blast_metrics(identities):
@@ -120,39 +175,6 @@ def extract_and_save_neighbors(record, instance_id, loc, db, window=10000):
             dist = int(feat_center - window)
             
             db.add_neighbor(instance_id, prot_id, product, dist, direction, translation)
-
-def suggest_module(co_results):
-    # Build a map of protein neighbors from co-occurrence data
-    neighbors_map = {}
-
-    for a, b, _ in co_results:
-        if a not in neighbors_map:
-            neighbors_map[a] = set()
-        if b not in neighbors_map:
-            neighbors_map[b] = set()
-
-        neighbors_map[a].add(b)
-        neighbors_map[b].add(a)
-
-    # Walk map to find connected groups
-    visited = set()
-    all_modules = []
-
-    for protein in neighbors_map:
-        if protein not in visited:
-            current_module = set()
-            stack = [protein]
-
-            while stack:
-                node = stack.pop()
-                if node not in visited:
-                    visited.add(node)
-                    current_module.add(node)
-                    stack.extend(neighbors_map[node] - visited)
-
-            all_modules.append(current_module)
-
-    return all_modules
         
     
 def generate_summary_report():
@@ -222,17 +244,27 @@ def generate_summary_report():
             print(f"{crow[0][:39]:<40} | {crow[1][:39]:<40} | {crow[2]}")
     else:
         print("No significant co-occurrence modules found yet.")
+
+    # 3. Look for functional modules that co-occur together.
+    raw_query = """
+    SELECT
+        instance_id,
+        product
+    FROM neighbors
+    ORDER BY instance_id
+    """
+    cursor.execute(raw_query)
+    raw_results = cursor.fetchall()
+
+    modules = identify_modules(raw_results, min_support=3, min_module_size=3)
+
+    print("\n--- Verified Functional Modules (Strict Co-occurrence) ---")
+    for genes, count in modules:
+        print(f"Freq: {count} | Genes: {', '.join(genes)}")
+    
         
     conn.close()
     print("="*145)
-
-    modules = suggest_module(co_results)
-
-    if modules:
-        print("\n--- Putative Functional Modules ---")
-        for i, mod in enumerate(modules, 1):
-        # Joining the set into a readable string
-            print(f"Module {i}: {', '.join(mod)}")
 
 if __name__ == "__main__":
     run_gnn_scout("input.fasta", hit_limit=200)
