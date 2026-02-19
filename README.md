@@ -24,7 +24,7 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 - Uses signed genomic distances to distinguish upstream and downstream neighbors of anchor proteins, and reveal possible operon orientation.
 - Automatically runs `hmmscan` against a Pfam-A database (locally) to annotate domains in hypothetical proteins.
 - Calculates and displays frequency, avg distance, spread of avg distances, strand, and avg size of genomic neighbors of homologs (="anchor" proteins).
-- Finds and reports top co-occurring genomic neighbors to map pathway modules/operons.
+- Finds and reports top co-occurring genomic neighbors and modules for follow-up analysis.
 
 ---
 
@@ -42,20 +42,29 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 3. Scans every hypothetical neighbor against Pfam and cluster remaining hypothetical proteins by sequence identity.
 4. Reports a synteny summary with frequency, avg distance, spread of distances, strand, and avg size of neighbors for easy viewing.
 5. Reports a top co-occurring neighbor pair table for given neighbors A and B with frequencies of co-occurrence.
+6. Runs and reports a co-occurrence analysis searching for linked modules of multiple members using genomic neighborhood data.
 
 ### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from _Piscinibacter sakaiensis_ for 200 BLAST hits:
 
 ![example enzyme engine output using PETase protein sequence as input](docs/PETase_example_output.png)
 
+**Genomic Neighbors Overview**
+
 - 128 hypothetical proteins in PETase blastp hit genomic neighborhoods, and assigned domains when possible using local hmmscan.
 - Top genomic neighbors of PETase homologs include transporters/permeases, chaperones, other hydrolases, efflux pumps, and transcriptional regulators.
-- Co-occurrence analysis suggests presence of a functional module containing the top genomic neighbors in 5-6 bacterial genomes. Analysis of phyla and expanded homolog searching for more powerful analysis to be added shortly.
+
+![example enzyme engine output using PETase protein sequence as input co-occurrence data](docs/PETase_co_occurrence.png)
+
+**Co-occurrence analysis**
+
+- Enzyme Engine displays the top 10 functional modules found sorted by frequency with at least 4 members.
+- For our 200-hit PETase search, the most frequent module consists of a transporter & permease, dihydroorotase, and efflux pump. Interestingly, dihydroorotase is often found associated with PET degredation pathway machinery.
 
 ---
 
 ## Future Directions and Features (In development)
 
-- Multiple-linkage analysis to move from anchor-neighbor pairs to detecting 3+ conserved modules.
-- Pull existing metabolic pathway data from MIBiG and MetaCyc and assign putative operon members to precise biochemical reactions to find mystery proteins that seem to be linked with a given gene cluster.
+- Expanding multiple-linkage analysis to probe larger genomic windows than the current +-10kb.
+- Pull existing metabolic pathway data from MetaCyc and assign putative operon members to precise biochemical reactions to find mystery proteins that seem to be linked with a given gene cluster.
 - For a given hypothetical/un-annotated protein, trigger a "deep search" that integrates phylogenetic, biosample, and structural analysis to investigate functional role of linked protein.
 - Alphafold integration, active site analysis, and possible molecular dynamics simulations to probe for functional mutations or sufficient deviation from predicted function.
