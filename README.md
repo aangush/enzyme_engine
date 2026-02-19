@@ -47,6 +47,7 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 ### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from _Piscinibacter sakaiensis_ for 200 BLAST hits:
 
 <img src="docs/PETase_blast_overview.png" width="50%">
+
 ![example enzyme engine output using PETase protein sequence as input](docs/PETase_output.png)
 
 **Genomic Neighbors Overview**
