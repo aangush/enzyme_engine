@@ -58,7 +58,7 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 **Co-occurrence analysis**
 
 - Enzyme Engine displays the top 10 functional modules found sorted by frequency with at least 4 members.
-- For our 200-hit PETase search, the most frequent module consists of a transporter & permease, dihydroorotase, and efflux pump. Interestingly, dihydroorotase is often found associated with PET degredation pathway machinery.
+- For our 200-hit PETase search, the most frequent module consists of a transporter & permease, dihydroorotase, and efflux pump. Interestingly, dihydroorotase is often found associated with PET degredation pathway machinery. Whether or not dihydroorotase is associated with PET degredation remains unknown.
 
 ---
 
