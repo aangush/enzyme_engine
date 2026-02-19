@@ -46,12 +46,13 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 
 ### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from _Piscinibacter sakaiensis_ for 200 BLAST hits:
 
-![example enzyme engine output using PETase protein sequence as input](docs/PETase_example_output.png)
+![example enzyme engine output of initial BLAST overview of stats + domain analysis](docs/PETase_blast_overview.png)
+![example enzyme engine output using PETase protein sequence as input](docs/PETase_output.png)
 
 **Genomic Neighbors Overview**
 
-- 128 hypothetical proteins in PETase blastp hit genomic neighborhoods, and assigned domains when possible using local hmmscan.
-- Top genomic neighbors of PETase homologs include transporters/permeases, chaperones, other hydrolases, efflux pumps, and transcriptional regulators.
+- Top genomic neighbors of PETase homologs include other hydrolases, transporters, dihydroorotase, and an efflux pump.
+- Spread is a function of the (maximum largest distance away - minimum largest distance away), providing a crude estimate of variation in neighbor genomic distance.
 
 ![example enzyme engine functional module suggestion output with PETase input](docs/PETase_modules.png)
 
