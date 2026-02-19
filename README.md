@@ -53,7 +53,7 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 - 128 hypothetical proteins in PETase blastp hit genomic neighborhoods, and assigned domains when possible using local hmmscan.
 - Top genomic neighbors of PETase homologs include transporters/permeases, chaperones, other hydrolases, efflux pumps, and transcriptional regulators.
 
-![example enzyme engine output using PETase protein sequence as input co-occurrence data](docs/PETase_co_occurrence.png)
+![example enzyme engine functional module suggestion output with PETase input](docs/PETase_modules.png)
 
 **Co-occurrence analysis**
 
