@@ -13,38 +13,73 @@ Entrez.api_key = os.getenv("NCBI_API_KEY")
 
 class NCBIClient:
     def get_locations(self, protein_id):
-        # Wrap the dispatcher to ensure one bad lookup doesn't freeze the caller
-        try:
-            locations = self._get_ipg_locations(protein_id)
-            if not locations:
+        # First loop: IPG database
+        for attempt in range(4):
+            try:
+                locations = self._get_ipg_locations(protein_id)
+                if locations:
+                    return locations
+                
+                else:
+                    # Server successful but no IPG record
+                    # Switch immedately to GenPept
+                    print(f"    -> No IPG data found for {protein_id}, switching to GenPept")
+                    break
+
+            # Exception for first loop IPG 
+            except Exception as e:
+                if attempt < 3: 
+                    wait_time = 2 ** attempt
+                    print(f"    -> Failed to fetch IPG report for {protein_id}, retrying in {wait_time}s... ")
+                    time.sleep(wait_time)
+                else:
+                    print(f"    -> Failed to fetch IPG report for {protein_id}, switching to GenPept")
+
+        # Second loop: GenPept database
+        for attempt in range (4):
+            try: 
                 locations = self._get_direct_locations(protein_id)
-            return locations
-        except Exception as e:
-            print(f"Dispatcher error for {protein_id}: {e}")
-            return []
+                if locations:
+                    return locations
+                
+                else:
+                    # Server successful but no GenPept report
+                    break
+
+            # Second loop exception    
+            except Exception as e:
+                if attempt < 3:
+                    wait_time = 2 ** attempt
+                    print(f"    -> Failed to fetch GenPept data for {protein_id}, retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"    -> Failed to fetch GenPept data for {protein_id}, skipping...")
+
+        # Fallback for total failure of protein
+        return[]
 
     def _get_ipg_locations(self, protein_id):
-        try:
-            handle = Entrez.efetch(db="protein", id=protein_id, rettype="ipg", retmode="xml", timeout=45)
-            raw_data = Entrez.read(handle)
-            handle.close()
-            locations = []
-            if isinstance(raw_data, dict) and 'IPGReport' in raw_data:
-                report = raw_data['IPGReport']
-                if isinstance(report, list):
-                    for protein in report: self._extract_cds_ipg(protein, locations)
-                else:
-                    self._extract_cds_ipg(report, locations)
-            return locations
-        except Exception: 
-            return []
+            handle = None
+            try:
+                handle = Entrez.efetch(db="protein", id=protein_id, rettype="ipg", retmode="xml", timeout=45)
+                raw_data = Entrez.read(handle)
+                locations = []
+                if isinstance(raw_data, dict) and 'IPGReport' in raw_data:
+                    report = raw_data['IPGReport']
+                    if isinstance(report, list):
+                        for protein in report: self._extract_cds_ipg(protein, locations)
+                    else:
+                        self._extract_cds_ipg(report, locations)
+                return locations
+            finally: 
+                if handle:
+                    handle.close()
 
     def _get_direct_locations(self, protein_id):
+        handle = None
         try:
-            # FIX: Added timeout here. Without this, giant GenBank files hang the script
             handle = Entrez.efetch(db="protein", id=protein_id, rettype="gp", retmode="text", timeout=45)
             record = SeqIO.read(handle, "genbank")
-            handle.close()
             locations = []
             for feat in record.features:
                 if feat.type == "CDS":
@@ -57,8 +92,9 @@ class NCBIClient:
                         coords = coord_str.split("..")
                         locations.append({'nuc_acc': nuc_acc, 'start': int(coords[0]), 'end': int(coords[1]), 'strand': strand})
             return locations
-        except: 
-            return []
+        finally: 
+            if handle:
+                handle.close()
 
     def _extract_cds_ipg(self, protein_data, locations_list):
         if not isinstance(protein_data, dict): return
@@ -75,18 +111,25 @@ class NCBIClient:
     def fetch_neighborhood(self, nuc_acc, start, end, window=10000):
         f_start, f_end = max(1, start - window), end + window
         # Added a small retry loop for network stability
-        for attempt in range(2):
+        
+        
+        for attempt in range(4):
             handle = None
             try:
+                # API rate limit buffer
+                time.sleep(0.15)
+
                 handle = Entrez.efetch(db="nuccore", id=nuc_acc, seq_start=f_start, seq_stop=f_end, rettype="gbwithparts", retmode="text", timeout=60)
                 record = SeqIO.read(handle, "genbank")
                 return record
+            
             except Exception as e:
-                if attempt == 0:
-                    print(f"Retrying {nuc_acc} due to network stall...")
-                    time.sleep(2)
+                if attempt < 3 :
+                    wait_time = 2 ** attempt
+                    print(f"Network error on {nuc_acc}, retrying in {wait_time}s...")
+                    time.sleep(wait_time)
                 else:
-                    print(f"Timeout fetching neighborhood for {nuc_acc}. Skipping.")
+                    print(f"Timeout fetching neighborhood for {nuc_acc} after 4 attempts. Skipping.")
             finally:
                 if handle:
                     handle.close()
