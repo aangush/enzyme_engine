@@ -1,7 +1,11 @@
 import os
 import time
+import socket
 from Bio import Entrez, SeqIO
 from dotenv import load_dotenv
+
+# Set global socket timeout to prevent stalled data from ncbi (occurs frequently)
+socket.setdefaulttimeout(65)
 
 load_dotenv()
 Entrez.email = os.getenv("NCBI_EMAIL")
@@ -72,16 +76,18 @@ class NCBIClient:
         f_start, f_end = max(1, start - window), end + window
         # Added a small retry loop for network stability
         for attempt in range(2):
+            handle = None
             try:
-                handle = Entrez.efetch(db="nuccore", id=nuc_acc, seq_start=f_start, seq_stop=f_end, 
-                                       rettype="gbwithparts", retmode="text", timeout=60)
+                handle = Entrez.efetch(db="nuccore", id=nuc_acc, seq_start=f_start, seq_stop=f_end, rettype="gbwithparts", retmode="text", timeout=60)
                 record = SeqIO.read(handle, "genbank")
-                handle.close()
                 return record
             except Exception as e:
                 if attempt == 0:
-                    print(f"Retrying {nuc_acc}...")
+                    print(f"Retrying {nuc_acc} due to network stall...")
                     time.sleep(2)
                 else:
                     print(f"Timeout fetching neighborhood for {nuc_acc}. Skipping.")
+            finally:
+                if handle:
+                    handle.close()
         return None

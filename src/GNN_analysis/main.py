@@ -30,7 +30,9 @@ def run_gnn_scout(input_fasta_path, hit_limit=200):
                 print(f"[{i}/{len(homolog_ids)}] Processing {pid}...")
                 
                 locations = client.get_locations(pid)
-                if not locations: continue
+                if not locations: 
+                    print(f"    -> No genomic locations found for {pid}. Skipping.")
+                    continue
             
                 loc = locations[0]
                 loc['anchor_id'] = pid
@@ -45,6 +47,9 @@ def run_gnn_scout(input_fasta_path, hit_limit=200):
                     instance_id = db.add_instance(pid, loc['nuc_acc'], loc['start'], loc['end'], loc['strand'])
                     extract_and_save_neighbors(record, instance_id, loc, db)
                     print(f"Neighborhood for {pid} saved.")
+
+                else:
+                    print(f"    -> Failed to fetch neighborhood record for {loc['nuc_acc']}. Skipping")
 
             except KeyboardInterrupt:
                 print(f"\nManual skip triggered for {pid}. Moving to next...")
