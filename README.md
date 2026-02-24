@@ -10,7 +10,7 @@
 
 Enzyme Engine is a bioinformatics tool designed to find and map genomic neighborhood networks of prokaryotic protein homologs. It combines BLAST discovery with local synteny analysis and domain identification to reveal conserved genetic modules across phyla. Features in-development include known operon function mapping through integration with MIBiG and MetaCyc databases, followed by a "deep search" consisting of phylogenetic and structural analysis of un-annotated/hypothetial proteins of interest.
 
----
+### Motivation
 
 This project was inspired by the technical limitations and bottlenecks I encountered working with poorly characterized biochemical pathways for metabolic engineering, and by my use of the [Enzyme Function Initiative Tools](https://efi.igb.illinois.edu/). It is an attempt to streamline, optimize, and expand on comparative genomic context searching to discover functional "accessory" proteins for a pathway of interest.
 
@@ -28,12 +28,34 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 
 ---
 
+# Getting Started
+
 ### Prerequisites
 
 - Python 3.10
 - HMMER3 Installed and accessible in PATH
 - NCBI API Key (Highly recommended for 100+ hits)
 - Local Pfam-A Database formatted with `hmmpress`
+
+### Installation
+1. Clone the repository and enter the directory:
+`git clone [https://github.com/aangush/enzyme_engine.git](https://github.com/aangush/enzyme_engine.git)
+cd enzyme_engine`
+
+2. Create and activate the Conda environment:
+`conda env create -f environment.yml 
+conda activate enzyme_env`
+
+3. Set up environmental variables: Create a .env file in the root directory and add your NCBI credentials to prevent strict API limiting
+`NCBI_EMAIL=your.email@domain.com
+NCBI_API_KEY=your_api_key_here`
+
+4. Prepare the pfam database: Download the `Pfam-A.hmm` database, format it using `hmmpress Pfam-A.hmm`, and place all resulting files into a data/pfam directory within the project root.
+
+### Quick Start
+To run the pipeline, provide a FASTA file containing your target anchor protein sequence. Execute the main script from the root directory:
+`python src/GNN_analysis/main.py path/to/input.fasta`
+
 
 ### Workflow
 
