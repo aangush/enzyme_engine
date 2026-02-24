@@ -52,9 +52,11 @@ NCBI_API_KEY=your_api_key_here`
 
 4. Prepare the pfam database: Download the `Pfam-A.hmm` database, format it using `hmmpress Pfam-A.hmm`, and place all resulting files into a data/pfam directory within the project root.
 
-### Quick Start
+### Quick Start:
 To run the pipeline, provide a FASTA file containing your target anchor protein sequence. Execute the main script from the root directory:
 `python src/GNN_analysis/main.py path/to/input.fasta`
+
+---
 
 
 ### Workflow
@@ -66,28 +68,35 @@ To run the pipeline, provide a FASTA file containing your target anchor protein 
 5. Reports a top co-occurring neighbor pair table for given neighbors A and B with frequencies of co-occurrence.
 6. Runs and reports a co-occurrence analysis searching for linked modules of multiple members using genomic neighborhood data.
 
+---
+
 ### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from _Piscinibacter sakaiensis_ for 200 BLAST hits:
 
-<img src="docs/PETase_blast_overview.png" width="50%">
-
-![example enzyme engine output using PETase protein sequence as input](docs/PETase_output.png)
+![example enzyme engine output using PETase protein sequence as input](docs/PETase_output_1.png)
 
 **Genomic Neighbors Overview**
 
-- Top genomic neighbors of PETase homologs include other hydrolases, transporters, dihydroorotase, and an efflux pump.
-- Spread is a function of the (maximum largest distance away - minimum largest distance away), providing a crude estimate of variation in neighbor genomic distance.
+- Top genomic neighbors of PETase homologs include chaperones, transporters, other hydrolases, and efflux pumps.
+- Spread is a function of the (maximum largest distance away - minimum largest distance away), providing a crude estimate of variation of nieghbor genomic distance to anchor.
 
-![example enzyme engine functional module suggestion output with PETase input](docs/PETase_modules.png)
+![example enzyme engine functional module suggestion output with PETase input](docs/PETase_output_modules.png)
 
 **Co-occurrence analysis**
 
-- Enzyme Engine displays the top 10 functional modules found sorted by frequency with at least 4 members.
-- For our 200-hit PETase search, the most frequent module consists of a transporter & permease, dihydroorotase, and efflux pump. Interestingly, dihydroorotase is often found associated with PET degredation pathway machinery. Whether or not dihydroorotase is associated with PET degredation remains unknown.
+- Enzyme Engine displays the top 10 functional modules found sorted by frequency with at least 4 members, providing insights about functional linkage.
+- For our 200-hit PETase search, the most frequent module contains a full transporter, efflux pump, and dihydroorotase. Whether or not dihydroorotase has a function in microbial PET degredation remains unknown.
 
 ---
 
+### Known Limitations & Technical Notes
+**NCBI Data Attrition and API Bottlenecks:** Due to the highly fragmented and uncurated nature of environmental sequence data (e.g., short WGS contigs missing flanking regions), NCBI Entrez queries for genomic neighborhoods frequently return empty. Furthermore, the NCBI API is prone to transient stalls and timeouts when fetching bulk GenBank records. As a result, a percentage of initial BLAST hits will inevitably be dropped during the neighborhood retrieval phase. I am currently working on scaling the query architecture  to process much larger initial hit pools, which will compensate for this data attrition and ensure high statistical power for functional module detection (and also take much longer).
+
+---
+
+
 ## Future Directions and Features (In development)
 
+- Increasing BLASTp hit number and breadth to better probe genomic space and gather more data.
 - Expanding multiple-linkage analysis to probe larger genomic windows than the current +-10kb.
 - Pull existing metabolic pathway data from MetaCyc and assign putative operon members to precise biochemical reactions to find mystery proteins that seem to be linked with a given gene cluster.
 - For a given hypothetical/un-annotated protein, trigger a "deep search" that integrates phylogenetic, biosample, and structural analysis to investigate functional role of linked protein.
