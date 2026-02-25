@@ -28,7 +28,7 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 
 ---
 
-# Getting Started
+## Getting Started
 
 ### Prerequisites
 
