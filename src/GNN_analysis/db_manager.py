@@ -10,9 +10,37 @@ class GNNDB:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS anchors (protein_id TEXT PRIMARY KEY, product TEXT, organism TEXT, sequence TEXT)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY AUTOINCREMENT, anchor_id TEXT, nuc_accession TEXT, start_pos INTEGER, end_pos INTEGER, strand INTEGER, UNIQUE(anchor_id, nuc_accession, start_pos))''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS neighbors (id INTEGER PRIMARY KEY AUTOINCREMENT, instance_id INTEGER, protein_id TEXT, product TEXT, distance_bp INTEGER, direction TEXT, sequence TEXT, FOREIGN KEY(instance_id) REFERENCES instances(id))''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS anchors (
+                       protein_id TEXT PRIMARY KEY, 
+                       product TEXT, 
+                       organism TEXT, 
+                       sequence TEXT)''')
+        
+        cursor.execute('''CREATE TABLE IF NOT EXISTS instances (
+                       id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                       anchor_id TEXT, 
+                       embl_accession TEXT, 
+                       start_pos INTEGER, 
+                       end_pos INTEGER, 
+                       strand INTEGER, 
+                       UNIQUE(anchor_id, nuc_accession, start_pos))''')
+       
+        cursor.execute('''CREATE TABLE IF NOT EXISTS neighbors (
+                       id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                       instance_id INTEGER, 
+                       protein_id TEXT, 
+                       product TEXT, 
+                       distance_bp INTEGER, 
+                       direction TEXT, 
+                       sequence TEXT, 
+                       review_status TEXT,
+                       ec_number TEXT,
+                       interpro_ids TEXT,
+                       pfam_ids TEXT,
+                       go_terms TEXT,
+                       pathway_xrefs TEXT,
+                       has_alphafold INTEGER,
+                       FOREIGN KEY(instance_id) REFERENCES instances(id))''')
         conn.commit()
         conn.close()
 

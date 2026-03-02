@@ -10,4 +10,6 @@ dependencies:
   - tqdm
   - pip:
       - tqdm==4.67.1
+      - requests
+      - aiohttp
 
