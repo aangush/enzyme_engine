@@ -1,30 +1,27 @@
 import requests
 import time
 import sys
-import io
-from Bio.Blast import NCBIXML
 
 class DiscoveryEngine:
     def find_homologs(self, sequence_fasta, hit_limit=500):
-        print("Submitting sequence search to EBI Job Dispatcher (NCBI BLAST+ against UniProtKB)...")
+        print(f"Submitting sequence search to EBI Job Dispatcher (NCBI BLAST+ against UniProtKB, limit={hit_limit})...")
         
-        # 1. Ensure FASTA formatting
         seq_clean = sequence_fasta.strip()
         if not seq_clean.startswith(">"):
             seq_clean = f">Query_Sequence\n{seq_clean}"
 
-        # 2. EBI Job Dispatcher endpoint and parameters
         submit_url = "https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/run"
         payload = {
-            "email": "enzyme_engine_user@gmail.com", # Swapped from @example.com to prevent spam filters
+            "email": "enzyme_engine_user@gmail.com", 
             "program": "blastp",
             "stype": "protein",
             "sequence": seq_clean,
-            "database": "uniprotkb"
+            "database": "uniprotkb",
+            "alignments": str(hit_limit),
+            "scores": str(hit_limit)
         }
         
         try:
-            # 3. Submit Job
             response = requests.post(submit_url, data=payload)
             if response.status_code != 200:
                 print(f"API Error: Server rejected payload. Details: {response.text}")
@@ -36,7 +33,6 @@ class DiscoveryEngine:
             
             status_url = f"https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/status/{job_id}"
             
-            # 4. Poll Status
             max_attempts = 240
             for attempt in range(max_attempts):
                 res = requests.get(status_url)
@@ -51,59 +47,65 @@ class DiscoveryEngine:
                 else:
                     print(f"\nError: Job status returned '{status}'")
                     return [], []
-                    
-            print("\nJob completed. Fetching results...")
             
-            # 5. Try XML first, if 400 Bad Request, fetch the standard output log to diagnose
-            result_url = f"https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/result/{job_id}/xml"
-            xml_res = requests.get(result_url)
-            
-            if xml_res.status_code == 400:
-                print(f"\nCould not fetch XML (400 Bad Request). Checking standard text output to diagnose...")
-                
-                # Fetch plain text output
-                out_url = f"https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/result/{job_id}/out"
-                out_res = requests.get(out_url)
-                
-                if out_res.status_code == 200:
-                    print(f"\n--- SERVER LOG PREVIEW ---\n{out_res.text[:1500]}\n--------------------------")
-                    if "No hits found" in out_res.text:
-                        print("\nConclusion: The BLAST search completed but found 0 homologs for this sequence.")
-                else:
-                    # If even the text log is missing, dump the available file types
-                    types_url = f"https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/resulttypes/{job_id}"
-                    types_res = requests.get(types_url)
-                    print(f"Available result files on server: {types_res.text}")
-                
+            if status != "FINISHED":
+                print(f"\nError: Search timed out after {max_attempts * 5 / 60} minutes. Status is still: {status}")
                 return [], []
-                
-            xml_res.raise_for_status()
+                    
+            print("\nJob completed. Fetching standard text results...")
             
-            # 6. Parse the XML if successful
-            blast_record = NCBIXML.read(io.StringIO(xml_res.text))
+            # Fetch the standard plaintext output
+            out_url = f"https://www.ebi.ac.uk/Tools/services/rest/ncbiblast/result/{job_id}/out"
+            out_res = requests.get(out_url)
+            out_res.raise_for_status()
+            
             homolog_ids = []
             scores = []
             
-            for alignment in blast_record.alignments:
-                if len(homolog_ids) >= hit_limit:
-                    break
-                    
-                raw_acc = alignment.accession
+            lines = out_res.text.split('\n')
+            parsing_hits = False
+            
+            for line in lines:
+                # Trigger when we reach the summary table
+                if "Sequences producing significant alignments:" in line:
+                    parsing_hits = True
+                    continue
                 
-                if ":" in raw_acc:
-                    acc = raw_acc.split(":")[-1]
-                elif "|" in raw_acc:
-                    acc = raw_acc.split("|")[1]
-                else:
-                    acc = raw_acc
-                    
-                homolog_ids.append(acc)
-                
-                if alignment.hsps:
-                    scores.append(alignment.hsps[0].score)
-                else:
-                    scores.append(0)
-                    
+                if parsing_hits:
+                    stripped = line.strip()
+                    if not stripped:
+                        # If we hit a blank line after collecting hits, the table is over
+                        if len(homolog_ids) > 0:
+                            break
+                        else:
+                            continue
+                            
+                    # Example line: "SP:A0A0K8P6T7 PETH_PISS1 Poly(ethylene ...  581     0.0"
+                    parts = stripped.split()
+                    if len(parts) >= 3:
+                        raw_id = parts[0]
+                        
+                        # Isolate the core UniProt accession
+                        if ":" in raw_id:
+                            acc = raw_id.split(":")[-1]
+                        elif "|" in raw_id:
+                            acc = raw_id.split("|")[1]
+                        else:
+                            acc = raw_id
+                        
+                        acc = acc.split(".")[0]
+                        
+                        try:
+                            score = float(parts[-2])
+                        except ValueError:
+                            score = 0.0
+                            
+                        homolog_ids.append(acc)
+                        scores.append(score)
+                        
+                        if len(homolog_ids) >= hit_limit:
+                            break
+                            
             print(f"Discovered {len(homolog_ids)} UniProt homologs.")
             return homolog_ids, scores
             

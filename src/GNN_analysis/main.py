@@ -17,6 +17,7 @@ except ImportError:
 from discovery import DiscoveryEngine
 from ena_client import UniProtENAClient
 from db_manager import GNNDB
+from domain_analyzer import DomainAnalyzer
 
 async def process_homolog(session, client, pid, window=10000):
     """
@@ -147,6 +148,11 @@ def run_gnn_scout(input_fasta_path, hit_limit=500):
             )
 
     print("Data extraction complete.")
+
+    # 3.5. Post-processing on hypothetical proteins
+
+    analyzer = DomainAnalyzer(db_path="data/GNN.db")
+    analyzer.analyze_hypotheticals()
 
     # 4. REPORT
     generate_summary_report()
