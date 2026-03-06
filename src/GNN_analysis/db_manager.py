@@ -10,6 +10,7 @@ class GNNDB:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+
         cursor.execute('''CREATE TABLE IF NOT EXISTS anchors (
                        protein_id TEXT PRIMARY KEY, 
                        product TEXT, 
@@ -23,7 +24,7 @@ class GNNDB:
                        start_pos INTEGER, 
                        end_pos INTEGER, 
                        strand INTEGER, 
-                       UNIQUE(anchor_id, nuc_accession, start_pos))''')
+                       UNIQUE(anchor_id, embl_accession, start_pos))''')
        
         cursor.execute('''CREATE TABLE IF NOT EXISTS neighbors (
                        id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -44,22 +45,22 @@ class GNNDB:
         conn.commit()
         conn.close()
 
-    def instance_exists(self, anchor_id, nuc_acc):
+    def instance_exists(self, anchor_id, embl_acc):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM instances WHERE anchor_id = ? AND nuc_accession = ?", (anchor_id, nuc_acc))
+        cursor.execute("SELECT id FROM instances WHERE anchor_id = ? AND nuc_accession = ?", (anchor_id, embl_acc))
         result = cursor.fetchone()
         conn.close()
         return result[0] if result else None
 
-    def add_instance(self, anchor_id, nuc_acc, start, end, strand):
+    def add_instance(self, anchor_id, embl_acc, start, end, strand):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("INSERT OR IGNORE INTO instances (anchor_id, nuc_accession, start_pos, end_pos, strand) VALUES (?, ?, ?, ?, ?)",
-                       (anchor_id, nuc_acc, start, end, strand))
+                       (anchor_id, embl_acc, start, end, strand))
         last_id = cursor.lastrowid
         if last_id == 0: # If IGNORE triggered, find existing ID
-            cursor.execute("SELECT id FROM instances WHERE anchor_id = ? AND nuc_accession = ?", (anchor_id, nuc_acc))
+            cursor.execute("SELECT id FROM instances WHERE anchor_id = ? AND nuc_accession = ?", (anchor_id, embl_acc))
             last_id = cursor.fetchone()[0]
         conn.commit()
         conn.close()

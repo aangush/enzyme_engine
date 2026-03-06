@@ -1,1 +1,0 @@
-# TODO: Replace NCBI queries with ENA/UniprotKB queries
