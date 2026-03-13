@@ -106,6 +106,7 @@ async def run_pipeline_async(homolog_ids):
         results = await tqdm.gather(*tasks, desc="Fetching Genomic Contexts")
         return results
 
+
 def run_gnn_scout(input_fasta_path, hit_limit=500):
     discovery = DiscoveryEngine()
     db = GNNDB()
