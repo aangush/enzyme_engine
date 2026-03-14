@@ -8,7 +8,7 @@
 
 ## Overview
 
-Enzyme Engine is a bioinformatics tool designed to find and map genomic neighborhood networks of prokaryotic protein homologs. It combines BLAST discovery with local synteny analysis and domain identification to reveal conserved genetic modules across phyla. Features in-development include known operon function mapping through integration with MIBiG and MetaCyc databases, followed by a "deep search" consisting of phylogenetic and structural analysis of un-annotated/hypothetial proteins of interest.
+Enzyme Engine is a bioinformatics tool designed to find and map genomic neighborhood networks of prokaryotic protein homologs. It combines BLAST discovery with local synteny analysis and domain identification to reveal conserved genetic modules across phyla. Features in-development include known operon function mapping through integration with MIBiG and MetaCyc databases, followed by a "deep search" consisting of phylogenetic and structural analysis of un-annotated/hypothetical proteins of interest.
 
 ### Motivation
 
@@ -34,7 +34,6 @@ _Furthermore, this project was motivated by a desire to leverage comparative gen
 
 - Python 3.10
 - HMMER3 Installed and accessible in PATH
-- NCBI API Key (Highly recommended for 100+ hits)
 - Local Pfam-A Database formatted with `hmmpress`
 
 ### Installation
@@ -68,33 +67,35 @@ To run the pipeline, provide a FASTA file containing your target anchor protein 
 
 5. Generates a synteny summary and computes co-occurrence networks to report verified functional modules with high statistical support.
 
-### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from _Piscinibacter sakaiensis_ for 200 BLAST hits:
+### Example output with input PETase (A0A0K8P6T7.1) plastic degrading enzyme from _Piscinibacter sakaiensis_ for 500 BLAST hits:
 
-![example enzyme engine output using PETase protein sequence as input](docs/PETase_output_1.png)
+![example enzyme engine output using PETase protein sequence as input](docs/uniprot_PETase_output_1.png)
 
 **Genomic Neighbors Overview**
 
-- Top genomic neighbors of PETase homologs include chaperones, transporters, other hydrolases, and efflux pumps.
-- Spread is a function of the (maximum largest distance away - minimum largest distance away), providing a crude estimate of variation of nieghbor genomic distance to anchor.
+- Top genomic neighbors of PETase homologs include other PET-related hydrolases, transporters, and possible downstream catabolic enzymes like Acyl-CoA dehydrogenase.
+- Spread is a function of the (maximum largest distance away - minimum largest distance away), providing a crude estimate of variation of neighbor genomic distance to anchor.
 
-![example enzyme engine functional module suggestion output with PETase input](docs/PETase_output_modules.png)
+![example enzyme engine functional module suggestion output with PETase input](docs/uniprot_PETase_output_2.png)
 
 **Co-occurrence analysis**
 
 - Enzyme Engine displays the top 10 functional modules found sorted by frequency with at least 4 members, providing insights about functional linkage.
-- For our 200-hit PETase search, the most frequent module contains a full transporter, efflux pump, and dihydroorotase. Whether or not dihydroorotase has a function in microbial PET degredation remains unknown.
+- For our 500-hit PETase search, the most frequent module contains a cutinase (PETases are derived from this family), alongside a complete ABC-type branched chain amino acid transport system, which could play a role in the transport of plastic degradation byproducts.
 
 ---
 
 ### Known Limitations & Technical Notes
 
-Architecture Update: The pipeline has been migrated from a synchronous NCBI Entrez architecture to an asynchronous model targeting UniProt and the ENA. This resolves previous issues with highly fragmented GenBank queries, transient API stalls, and heavy data attrition during neighborhood retrieval.
+The pipeline recently moved from a synchronous NCBI Entrez setup to an asynchronous UniProt/ENA architecture. This change was made to resolve frequent API timeouts and issues with highly fragmented GenBank queries.
+
+Currently, the UniProt/ENA pipeline yields fewer genomic neighbors than the previous version. This is because the new script maps each discovered protein to only a single primary genomic contig. The previous NCBI IPG approach mapped a single protein sequence to every known sequenced genome it appeared in, multiplying the results. A fix is actively in development to loop through all available ENA coordinates for every UniProt hit, which will restore the pipeline's full statistical power.
 
 ---
 
 ## Future Directions and Features (In development)
 
-- Expanding multiple-linkage analysis to probe larger genomic windows than the current +-10kb.
+- Expanding multiple-linkage analysis to probe larger genomic windows than the current +-10kb, or probe +- X CDSs, to normalize for genomic distance spread.
 
 - Pulling existing metabolic pathway data from MetaCyc and assigning putative operon members to precise biochemical reactions to find unknown proteins linked with a given gene cluster.
 
