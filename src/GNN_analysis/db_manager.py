@@ -41,6 +41,7 @@ class GNNDB:
                        go_terms TEXT,
                        pathway_xrefs TEXT,
                        has_alphafold INTEGER,
+                       is_membrane INTEGER,
                        FOREIGN KEY(instance_id) REFERENCES instances(id))''')
         conn.commit()
         conn.close()
@@ -59,16 +60,17 @@ class GNNDB:
         cursor.execute("INSERT OR IGNORE INTO instances (anchor_id, embl_accession, start_pos, end_pos, strand) VALUES (?, ?, ?, ?, ?)",
                        (anchor_id, embl_acc, start, end, strand))
         last_id = cursor.lastrowid
-        if last_id == 0: # If IGNORE triggered, find existing ID
+        if last_id == 0: 
             cursor.execute("SELECT id FROM instances WHERE anchor_id = ? AND embl_accession = ?", (anchor_id, embl_acc))
             last_id = cursor.fetchone()[0]
         conn.commit()
         conn.close()
-        return last_id
 
-    def add_neighbor(self, instance_id, pid, product, dist, direction, seq=""):
+    def add_neighbor(self, instance_id, pid, product, dist, direction, seq="", pfam_ids="", is_membrane=0):
         conn = sqlite3.connect(self.db_path)
-        conn.execute("INSERT INTO neighbors (instance_id, protein_id, product, distance_bp, direction, sequence) VALUES (?, ?, ?, ?, ?, ?)",
-                     (instance_id, pid, product, dist, direction, seq))
+        conn.execute("""INSERT INTO neighbors 
+                     (instance_id, protein_id, product, distance_bp, direction, sequence, pfam_ids, is_membrane) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                     (instance_id, pid, product, dist, direction, seq, pfam_ids, is_membrane))
         conn.commit()
         conn.close()
