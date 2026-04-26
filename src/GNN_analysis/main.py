@@ -26,7 +26,7 @@ async def process_homolog(session, client, pid, window_cds=15, required_pfams=No
 
     results = []
     
-    for loc in locations[:3]:
+    for loc in locations[:5]:
         embl_acc = loc['embl_acc']
         record = await client.fetch_ena_neighborhood(session, embl_acc)
         if not record:
@@ -195,6 +195,7 @@ def generate_summary_report():
     conn = sqlite3.connect("data/GNN.db")
     cursor = conn.cursor()
     
+    # 1. Raw Individual Frequencies
     query = """
     SELECT 
         product, 
@@ -221,20 +222,49 @@ def generate_summary_report():
         display_name = (display_name[:62] + '..') if len(display_name) > 65 else display_name
         print(f"{display_name:<65} | {row[2]:<8} | {row[3]:<5} | {row[4]:>9} bp | {row[5]:>6} bp | {row[6]}aa")
 
+    # 2. Restore 2-Pair Co-occurring Networks
+    print("\n" + "-"*60)
+    print("TOP CO-OCCURRING NEIGHBOR PAIRS (Pathway Modules)")
+    print("-"*60)
+    
+    co_query = """
+    SELECT 
+        n1.product AS Neighbor_A, 
+        n2.product AS Neighbor_B, 
+        COUNT(DISTINCT n1.instance_id) AS CoOccurrence_Freq
+    FROM neighbors n1
+    JOIN neighbors n2 ON n1.instance_id = n2.instance_id
+    WHERE n1.product < n2.product 
+    GROUP BY Neighbor_A, Neighbor_B
+    HAVING CoOccurrence_Freq >= 3
+    ORDER BY CoOccurrence_Freq DESC
+    LIMIT 15
+    """
+    cursor.execute(co_query)
+    co_results = cursor.fetchall()
+    
+    if co_results:
+        print(f"{'Module Component A':<40} | {'Module Component B':<40} | {'Freq'}")
+        for crow in co_results:
+            print(f"{crow[0][:39]:<40} | {crow[1][:39]:<40} | {crow[2]}")
+    else:
+        print("No significant co-occurrence modules found yet.")
+
+    # 3. Maximal Modules 
     print("\n" + "="*80)
     print("TOP 10 VERIFIED FUNCTIONAL MODULES BY FREQ (Maximal Sets Only)")
     print("="*80)
 
+    # Reverted identifier back to product to prevent fragmentation
     raw_query = """
-    SELECT instance_id, 
-           CASE WHEN pfam_ids != '' THEN pfam_ids ELSE product END as identifier
+    SELECT instance_id, product as identifier
     FROM neighbors
     ORDER BY instance_id
     """
     cursor.execute(raw_query)
     raw_results = cursor.fetchall()
 
-    modules = get_maximal_modules(raw_results, min_support=2, min_module_size=3)
+    modules = get_maximal_modules(raw_results, min_support=3, min_module_size=3)
 
     if not modules:
         print("No modules found matching criteria.")
