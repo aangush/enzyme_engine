@@ -5,6 +5,8 @@ import asyncio
 import aiohttp
 from collections import defaultdict, Counter
 from itertools import combinations
+from dotenv import load_dotenv
+
 try:
     from tqdm.asyncio import tqdm
 except ImportError:
@@ -17,9 +19,6 @@ from db_manager import GNNDB
 from domain_analyzer import DomainAnalyzer
 
 async def process_homolog(session, client, pid, window_cds=15, required_pfams=None):
-    """
-    Async worker to fetch metadata, ENA context, and return structured neighbor data.
-    """
     metadata, locations = await client.fetch_uniprot_data(session, pid)
     
     if not locations or not metadata:
@@ -27,14 +26,12 @@ async def process_homolog(session, client, pid, window_cds=15, required_pfams=No
 
     results = []
     
-    # Process up to 3 contigs per UniProt ID to resolve the statistical bottleneck
     for loc in locations[:3]:
         embl_acc = loc['embl_acc']
         record = await client.fetch_ena_neighborhood(session, embl_acc)
         if not record:
             continue
 
-        # Isolate CDS features to normalize window size across genomes
         cds_features = [feat for feat in record.features if feat.type == "CDS"]
 
         anchor_idx = None
@@ -62,6 +59,10 @@ async def process_homolog(session, client, pid, window_cds=15, required_pfams=No
         extracted_neighbors = []
         locus_pfams = set()
         
+        # Extract the anchor's own domains so they count towards the multi-anchor constraint
+        anchor_pfams = [ref.split(":")[1] for ref in a_feat.qualifiers.get("db_xref", []) if "Pfam" in ref or "PANTHER" in ref or "InterPro" in ref]
+        locus_pfams.update(anchor_pfams)
+        
         start_idx = max(0, anchor_idx - window_cds)
         end_idx = min(len(cds_features), anchor_idx + window_cds + 1)
 
@@ -80,7 +81,6 @@ async def process_homolog(session, client, pid, window_cds=15, required_pfams=No
             product = feat.qualifiers.get("product", ["unknown"])[0]
             translation = feat.qualifiers.get("translation", [""])[0]
             
-            # Standardize nodes using ENA database cross-references
             pfam_ids = [ref.split(":")[1] for ref in feat.qualifiers.get("db_xref", []) if "Pfam" in ref or "PANTHER" in ref or "InterPro" in ref]
             locus_pfams.update(pfam_ids)
             pfam_str = ",".join(pfam_ids)
@@ -90,25 +90,19 @@ async def process_homolog(session, client, pid, window_cds=15, required_pfams=No
                 if "UniProtKB/TrEMBL" in ref or "UniProtKB/Swiss-Prot" in ref:
                     n_pid = ref.split(":")[1]
 
-            # Proxy filter for eukaryotic/membrane compatibility
-            notes = " ".join(feat.qualifiers.get("note", [])).lower()
-            is_membrane = 1 if ("membrane" in notes or "transporter" in notes or "membrane" in product.lower()) else 0
-
             extracted_neighbors.append({
                 "pid": n_pid,
                 "product": product,
                 "dist": dist,
                 "direction": direction,
                 "seq": translation,
-                "pfam_ids": pfam_str,
-                "is_membrane": is_membrane
+                "pfam_ids": pfam_str
             })
 
-        # Multi-anchor locus requirement filter
         if required_pfams:
             overlap = locus_pfams.intersection(set(required_pfams))
             if len(overlap) < len(required_pfams):
-                continue # Discard this contig; it lacks the necessary pathway components
+                continue 
 
         results.append((instance_data, extracted_neighbors))
 
@@ -131,7 +125,6 @@ def run_gnn_scout(input_fasta_path, hit_limit=500, required_pfams=None):
     homolog_ids, scores = discovery.find_homologs(fasta_str, hit_limit=hit_limit)
 
     print(f"\nInitiating async retrieval for {len(homolog_ids)} targets...")
-    # Pass required pfams to async runner
     results = asyncio.run(run_pipeline_async(homolog_ids, required_pfams=required_pfams))
 
     print("\nCommitting neighborhood data to database...")
@@ -153,8 +146,7 @@ def run_gnn_scout(input_fasta_path, hit_limit=500, required_pfams=None):
                     n["dist"], 
                     n["direction"], 
                     n["seq"],
-                    n["pfam_ids"],
-                    n["is_membrane"]
+                    n["pfam_ids"]
                 )
 
     print("Data extraction complete.")
@@ -165,7 +157,6 @@ def run_gnn_scout(input_fasta_path, hit_limit=500, required_pfams=None):
 def get_maximal_modules(raw_results, min_support=3, min_module_size=4):
     neighborhoods = defaultdict(set)
     for instance_id, identifier in raw_results:
-        # Operating on the standardized identifier (Pfam or product string)
         neighborhoods[instance_id].add(identifier)
 
     itemset_counts = Counter()
@@ -197,14 +188,43 @@ def get_maximal_modules(raw_results, min_support=3, min_module_size=4):
     return final_modules[:10]
 
 def generate_summary_report():
-    print("\n" + "="*80)
-    print("TOP 10 VERIFIED FUNCTIONAL MODULES BY FREQ (Maximal Sets Only)")
-    print("="*80)
+    print("\n" + "="*145)
+    print(f"{'GENOMIC NEIGHBORHOOD & CO-OCCURRENCE REPORT':^145}")
+    print("="*145)
     
     conn = sqlite3.connect("data/GNN.db")
     cursor = conn.cursor()
+    
+    query = """
+    SELECT 
+        product, 
+        MAX(protein_id) as example_acc,
+        direction, 
+        COUNT(*) as freq, 
+        CAST(AVG(distance_bp) AS INT) as avg_dist,
+        CAST(MAX(distance_bp) - MIN(distance_bp) AS INT) as spread,
+        CAST(AVG(LENGTH(sequence)) AS INT) as avg_len
+    FROM neighbors 
+    GROUP BY product, direction
+    HAVING freq >= 2
+    ORDER BY freq DESC 
+    LIMIT 40
+    """
+    cursor.execute(query)
+    results = cursor.fetchall()
+    
+    print(f"{'Neighbor Product (Example Accession)':<65} | {'Strand':<8} | {'Freq':<5} | {'Avg Dist':<12} | {'Spread':<8} | {'Len'}")
+    print("-" * 145)
+    
+    for row in results:
+        display_name = f"{row[0]} ({row[1]})"
+        display_name = (display_name[:62] + '..') if len(display_name) > 65 else display_name
+        print(f"{display_name:<65} | {row[2]:<8} | {row[3]:<5} | {row[4]:>9} bp | {row[5]:>6} bp | {row[6]}aa")
 
-    # Standardization mapping: Use Pfam ID as node identity if available, else product name
+    print("\n" + "="*80)
+    print("TOP 10 VERIFIED FUNCTIONAL MODULES BY FREQ (Maximal Sets Only)")
+    print("="*80)
+
     raw_query = """
     SELECT instance_id, 
            CASE WHEN pfam_ids != '' THEN pfam_ids ELSE product END as identifier
@@ -214,7 +234,7 @@ def generate_summary_report():
     cursor.execute(raw_query)
     raw_results = cursor.fetchall()
 
-    modules = get_maximal_modules(raw_results, min_support=3, min_module_size=3)
+    modules = get_maximal_modules(raw_results, min_support=2, min_module_size=3)
 
     if not modules:
         print("No modules found matching criteria.")
@@ -226,13 +246,14 @@ def generate_summary_report():
             print("-" * 40)
             
     conn.close()
+    print("="*145)
 
 if __name__ == "__main__":
     input_file = sys.argv[1] if len(sys.argv) > 1 else "input.fasta"
     
-    # Example usage for the multi-anchor constraint:
-    # Set this list to the known Pfam domains of your 8-enzyme pathway.
-    # The pipeline will only return genomic windows containing these domains.
-    mp_pathway_pfams = ["IPR001559", "IPR050631", "IPR037513", "IPR050770", "PTHR11699"]
+    load_dotenv()
     
-    run_gnn_scout(input_file, hit_limit=500, required_pfams=mp_pathway_pfams)
+    env_pfams = os.getenv("TARGET_PFAMS")
+    required_pfams = env_pfams.split(",") if env_pfams else None
+    
+    run_gnn_scout(input_file, hit_limit=500, required_pfams=required_pfams)

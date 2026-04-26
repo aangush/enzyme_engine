@@ -41,7 +41,6 @@ class GNNDB:
                        go_terms TEXT,
                        pathway_xrefs TEXT,
                        has_alphafold INTEGER,
-                       is_membrane INTEGER,
                        FOREIGN KEY(instance_id) REFERENCES instances(id))''')
         conn.commit()
         conn.close()
@@ -66,11 +65,11 @@ class GNNDB:
         conn.commit()
         conn.close()
 
-    def add_neighbor(self, instance_id, pid, product, dist, direction, seq="", pfam_ids="", is_membrane=0):
+    def add_neighbor(self, instance_id, pid, product, dist, direction, seq="", pfam_ids=""):
         conn = sqlite3.connect(self.db_path)
         conn.execute("""INSERT INTO neighbors 
-                     (instance_id, protein_id, product, distance_bp, direction, sequence, pfam_ids, is_membrane) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                     (instance_id, pid, product, dist, direction, seq, pfam_ids, is_membrane))
+                     (instance_id, protein_id, product, distance_bp, direction, sequence, pfam_ids) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                     (instance_id, pid, product, dist, direction, seq, pfam_ids))
         conn.commit()
         conn.close()
